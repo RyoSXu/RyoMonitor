@@ -56,6 +56,7 @@ if [ ! -f "$COLLECTOR_ENV" ]; then
   cat > "$COLLECTOR_ENV" <<'EOF'
 RYO_MONITOR_STATUS_FILE=/opt/ryo-monitor/app/status.json
 RYO_MONITOR_IFACE=eth0
+RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh"
 EOF
   chmod 0644 "$COLLECTOR_ENV"
 else

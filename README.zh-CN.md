@@ -157,6 +157,27 @@ bash scripts/update.sh
 ```bash
 RYO_MONITOR_STATUS_FILE=/opt/ryo-monitor/app/status.json
 RYO_MONITOR_IFACE=eth0
+RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh"
+```
+
+### 自定义服务监控
+
+RyoMonitor 默认检查 systemd 服务。可以用 `RYO_MONITOR_SERVICES` 配置看板顶部的服务状态：
+
+```bash
+RYO_MONITOR_SERVICES="Nginx=nginx Docker=docker PostgreSQL=postgresql"
+```
+
+每一项格式是：
+
+```text
+展示名=systemd服务名
+```
+
+展示名会原样显示在看板里，服务名会传给：
+
+```bash
+systemctl is-active <unit>
 ```
 
 ## 安全建议

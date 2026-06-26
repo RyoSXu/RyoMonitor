@@ -3,6 +3,7 @@ set -u
 
 OUT="${RYO_MONITOR_STATUS_FILE:-/opt/ryo-monitor/app/status.json}"
 IFACE="${RYO_MONITOR_IFACE:-eth0}"
+SERVICES="${RYO_MONITOR_SERVICES:-OpenList=openlist Caddy=caddy SSH=ssh}"
 
 mkdir -p "$(dirname "$OUT")"
 
@@ -63,9 +64,32 @@ while true; do
     uptime_text="已运行 ${up_minutes}分钟"
   fi
 
-  openlist_status=$(systemctl is-active openlist 2>/dev/null || echo unknown)
-  caddy_status=$(systemctl is-active caddy 2>/dev/null || echo unknown)
-  ssh_status=$(systemctl is-active ssh 2>/dev/null || echo unknown)
+  services_json=""
+  openlist_status="unknown"
+  caddy_status="unknown"
+  ssh_status="unknown"
+
+  for item in $SERVICES; do
+    display_name=${item%%=*}
+    unit_name=${item#*=}
+    [ -z "$display_name" ] && continue
+    [ -z "$unit_name" ] && continue
+    [ "$display_name" = "$unit_name" ] && continue
+
+    status=$(systemctl is-active "$unit_name" 2>/dev/null || echo unknown)
+    case "$unit_name" in
+      openlist) openlist_status="$status" ;;
+      caddy) caddy_status="$status" ;;
+      ssh|sshd) ssh_status="$status" ;;
+    esac
+
+    escaped_name=$(printf '%s' "$display_name" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    escaped_unit=$(printf '%s' "$unit_name" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    escaped_status=$(printf '%s' "$status" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    services_json="${services_json}{\"name\":\"$escaped_name\",\"unit\":\"$escaped_unit\",\"status\":\"$escaped_status\"},"
+  done
+
+  services_json=${services_json%,}
 
   top_processes=$(ps -eo pid,comm,%cpu,%mem,rss --sort=-rss | head -11 | awk '
     NR==1 {next}
@@ -104,6 +128,7 @@ while true; do
   "openlist": "$openlist_status",
   "caddy": "$caddy_status",
   "ssh": "$ssh_status",
+  "services": [$services_json],
 
   "processes": [$top_processes]
 }

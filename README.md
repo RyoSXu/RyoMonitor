@@ -157,6 +157,27 @@ Example:
 ```bash
 RYO_MONITOR_STATUS_FILE=/opt/ryo-monitor/app/status.json
 RYO_MONITOR_IFACE=eth0
+RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh"
+```
+
+### Custom Service Checks
+
+RyoMonitor checks systemd services by default. Configure the dashboard service pills with `RYO_MONITOR_SERVICES`:
+
+```bash
+RYO_MONITOR_SERVICES="Nginx=nginx Docker=docker PostgreSQL=postgresql"
+```
+
+Each item uses this format:
+
+```text
+DisplayName=systemd-unit-name
+```
+
+The display name is shown as-is in the dashboard. The unit name is passed to:
+
+```bash
+systemctl is-active <unit>
 ```
 
 ## Security Notes
