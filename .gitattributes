@@ -6,3 +6,4 @@
 *.html text eol=lf
 *.caddyfile text eol=lf
 Caddyfile.example text eol=lf
+*.png binary

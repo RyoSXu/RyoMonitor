@@ -100,6 +100,7 @@ LOGIN_PAGE = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>RyoMonitor</title>
+<link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
 <style>
 :root {
   color-scheme: dark;
@@ -370,6 +371,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             next_path = parse_qs(parsed.query).get("next", ["/"])[0]
             self.send_login(next_path=next_path if next_path.startswith("/") else "/")
+            return
+        if path.startswith("/assets/"):
+            self.serve_static()
             return
         if not valid_session(self.headers.get("Cookie")):
             self.redirect(f"/login?next={quote(self.path, safe='/?=&')}")

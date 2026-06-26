@@ -1,35 +1,67 @@
+<p align="center">
+  <img src="app/assets/logo.svg" alt="RyoMonitor logo" width="120">
+</p>
+
 # RyoMonitor
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-RyoMonitor 是一个轻量的自托管服务器监控面板，包含深色 Web 看板、密码登录页，以及中文/英文显示切换。
+RyoMonitor 是一个轻量的自托管 VPS 监控面板，带深色看板、密码登录，并且不需要前端构建步骤。
 
-它面向单台 VPS 使用：
+它适合小型服务器：当完整监控系统太重，但你又需要一个清晰、私有、容易同步的状态页时，RyoMonitor 正好够用。
 
-- Bash 采集脚本每秒写入一次 `status.json`。
-- 静态监控看板读取 `status.json`。
-- Python 认证网关负责登录和静态文件服务。
-- Caddy 负责 HTTPS，并反代到 `127.0.0.1:8090`。
+<p align="center">
+  <img src="docs/screenshot.png" alt="RyoMonitor dashboard" width="900">
+</p>
 
-## 功能
+## 为什么是 RyoMonitor
 
-- 展示 CPU、内存、Swap、磁盘、网络、平均负载、服务状态和主要进程。
-- Web UI 支持中文和英文显示。
-- 语言选择保存在 `localStorage`。
-- 密码登录使用安全的 `HttpOnly` Cookie。
-- 不需要数据库，也不需要前端构建步骤。
-- 支持 GitHub 推送后在 VPS 上 `git pull` 更新。
+- Bash + Python 小体量运行时
+- 不需要数据库
+- 不需要前端构建
+- 适合单台 VPS 部署
+- 自带密码保护
+- Web UI 支持中文和英文
+- 支持 GitHub 同步更新
+
+## 展示内容
+
+- CPU 使用率
+- 内存和 Swap 使用率
+- 磁盘使用率
+- 网络吞吐
+- 平均负载
+- 服务状态
+- 按内存占用排序的主要进程
+
+## 工作方式
+
+```text
+ryo-monitor.service
+  -> scripts/ryo-monitor.sh
+  -> app/status.json
+
+ryo-mon-auth.service
+  -> app/mon-auth.py
+  -> 密码登录 + 静态看板
+
+Caddy
+  -> HTTPS
+  -> reverse_proxy 127.0.0.1:8090
+```
 
 ## 文件结构
 
 ```text
 app/index.html              监控看板 UI
 app/mon-auth.py             密码登录和静态文件网关
+app/assets/logo.svg         项目 logo 和前端图标
 scripts/ryo-monitor.sh      指标采集脚本
 scripts/install.sh          首次安装脚本
 scripts/update.sh           git pull + 重启脚本
 systemd/*.service           systemd 服务模板
 caddy/Caddyfile.example     Caddy 反代示例
+docs/screenshot.png         看板截图
 .env.example                环境变量示例
 ```
 
@@ -41,7 +73,7 @@ caddy/Caddyfile.example     Caddy 反代示例
 - Caddy
 - Git，用于 GitHub 同步更新
 
-## 在 VPS 上安装
+## 安装
 
 把仓库克隆到 `/opt/ryo-monitor`：
 
@@ -91,25 +123,6 @@ bash scripts/update.sh
 ```
 
 更新脚本会执行 `git pull --ff-only`，检查 Python 和 Bash 语法，重启两个服务，并检查认证网关健康状态。
-
-## 服务
-
-```bash
-systemctl status ryo-monitor.service
-systemctl status ryo-mon-auth.service
-```
-
-`ryo-monitor.service` 写入：
-
-```text
-/opt/ryo-monitor/app/status.json
-```
-
-`ryo-mon-auth.service` 监听：
-
-```text
-127.0.0.1:8090
-```
 
 ## 配置
 

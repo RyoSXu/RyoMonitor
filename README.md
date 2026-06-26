@@ -1,35 +1,67 @@
+<p align="center">
+  <img src="app/assets/logo.svg" alt="RyoMonitor logo" width="120">
+</p>
+
 # RyoMonitor
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-RyoMonitor is a small self-hosted server monitor with a dark web dashboard, a password login page, and Chinese/English UI switching.
+RyoMonitor is a lightweight self-hosted VPS monitor with a dark dashboard, password login, and zero build step.
 
-It is designed for a single VPS:
+It is built for small servers where a full monitoring stack is more than you need.
 
-- A Bash collector writes `status.json` once per second.
-- A static dashboard reads `status.json`.
-- A Python auth gateway serves the dashboard after password login.
-- Caddy terminates HTTPS and reverse proxies to `127.0.0.1:8090`.
+<p align="center">
+  <img src="docs/screenshot.png" alt="RyoMonitor dashboard" width="900">
+</p>
 
-## Features
+## Why RyoMonitor
 
-- Lightweight dashboard for CPU, memory, swap, disk, network, load average, service states, and top processes.
-- Chinese and English display modes for the web UI.
-- Language selection is stored in `localStorage`.
-- Password login with a secure `HttpOnly` cookie.
-- No database or frontend build step.
-- Git-based update workflow for VPS deployments.
+- Lightweight Bash + Python runtime
+- No database
+- No frontend build step
+- Single VPS deployment
+- Password-protected dashboard
+- Chinese and English web UI
+- Git-based update workflow
+
+## What It Shows
+
+- CPU usage
+- Memory and swap usage
+- Disk usage
+- Network throughput
+- Load average
+- Service status
+- Top processes by memory usage
+
+## How It Works
+
+```text
+ryo-monitor.service
+  -> scripts/ryo-monitor.sh
+  -> app/status.json
+
+ryo-mon-auth.service
+  -> app/mon-auth.py
+  -> password login + static dashboard
+
+Caddy
+  -> HTTPS
+  -> reverse_proxy 127.0.0.1:8090
+```
 
 ## Files
 
 ```text
 app/index.html              Dashboard UI
 app/mon-auth.py             Password login and static file gateway
+app/assets/logo.svg         Project logo and frontend icon
 scripts/ryo-monitor.sh      Metrics collector
 scripts/install.sh          First install helper
 scripts/update.sh           Git pull + restart helper
 systemd/*.service           systemd unit templates
 caddy/Caddyfile.example     Caddy reverse proxy example
+docs/screenshot.png         Dashboard screenshot
 .env.example                Example environment variables
 ```
 
@@ -41,7 +73,7 @@ caddy/Caddyfile.example     Caddy reverse proxy example
 - Caddy
 - Git, if you want GitHub-based updates
 
-## Install On A VPS
+## Install
 
 Clone the repository to `/opt/ryo-monitor`:
 
@@ -91,25 +123,6 @@ bash scripts/update.sh
 ```
 
 The update script runs `git pull --ff-only`, checks Python and Bash syntax, restarts both services, and checks the auth gateway health endpoint.
-
-## Services
-
-```bash
-systemctl status ryo-monitor.service
-systemctl status ryo-mon-auth.service
-```
-
-`ryo-monitor.service` writes:
-
-```text
-/opt/ryo-monitor/app/status.json
-```
-
-`ryo-mon-auth.service` listens on:
-
-```text
-127.0.0.1:8090
-```
 
 ## Configuration
 
