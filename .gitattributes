@@ -1,0 +1,8 @@
+*.sh text eol=lf
+*.py text eol=lf
+*.service text eol=lf
+*.example text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.caddyfile text eol=lf
+Caddyfile.example text eol=lf
