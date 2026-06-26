@@ -1,0 +1,9 @@
+app/status.json
+*.tmp
+*.bak
+*.bak.*
+.env
+ryo-mon-auth.env
+ryo-monitor.env
+__pycache__/
+*.pyc

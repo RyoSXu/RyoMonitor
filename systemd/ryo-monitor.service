@@ -1,0 +1,13 @@
+[Unit]
+Description=RyoMonitor metrics collector
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/ryo-monitor.env
+ExecStart=/opt/ryo-monitor/scripts/ryo-monitor.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

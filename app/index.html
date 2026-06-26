@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RyoMonitor</title>
+<style>
+body{
+  margin:0;
+  background:#111;
+  color:#eee;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+
+main{
+  max-width:900px;
+  margin:0 auto;
+  padding:24px;
+}
+
+h1{
+  margin:0 0 6px;
+  font-size:24px;
+}
+
+.sub{
+  color:#aaa;
+  margin-bottom:12px;
+  font-size:14px;
+}
+
+.service-strip{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:20px;
+}
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  padding:6px 10px;
+  border:1px solid #333;
+  border-radius:999px;
+  background:#1a1a1a;
+  font-size:13px;
+  color:#ddd;
+}
+
+.dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#777;
+}
+
+.pill.active .dot{
+  background:#77ff8a;
+}
+
+.pill.inactive .dot,
+.pill.failed .dot,
+.pill.unknown .dot{
+  background:#ff8a8a;
+}
+
+.grid{
+  display:grid;
+  gap:12px;
+  margin-bottom:20px;
+}
+
+.metrics-main{
+  grid-template-columns:repeat(4,1fr);
+}
+
+.metrics-second{
+  grid-template-columns:repeat(4,1fr);
+}
+
+.load-card{
+  grid-column:span 3;
+}
+
+.card{
+  background:#1b1b1b;
+  border:1px solid #333;
+  border-radius:12px;
+  padding:16px;
+  box-sizing:border-box;
+  min-height:118px;
+}
+
+.label{
+  color:#aaa;
+  font-size:13px;
+  margin-bottom:8px;
+}
+
+.value{
+  font-size:22px;
+  font-weight:700;
+  line-height:1.2;
+  white-space:pre-line;
+}
+
+.detail{
+  margin-top:8px;
+  font-size:14px;
+  font-weight:600;
+  line-height:1.45;
+  color:#eee;
+  white-space:pre-line;
+}
+
+.load-detail{
+  font-size:14px;
+  font-weight:600;
+  line-height:1.6;
+  white-space:pre-line;
+}
+
+.table-card{
+  margin-top:20px;
+  background:#1b1b1b;
+  border:1px solid #333;
+  border-radius:12px;
+  overflow:hidden;
+  box-sizing:border-box;
+}
+
+.table-card table{
+  width:100%;
+  margin:0;
+  border:0;
+  border-radius:0;
+  border-collapse:separate;
+  border-spacing:0;
+  background:#1b1b1b;
+}
+
+th,td{
+  padding:10px;
+  border-bottom:1px solid #333;
+  text-align:left;
+  font-size:13px;
+}
+
+th{
+  color:#aaa;
+  font-weight:500;
+}
+
+tbody tr:last-child td{
+  border-bottom:0;
+}
+
+.err{
+  color:#ff9b9b;
+  margin-top:16px;
+  font-size:13px;
+}
+
+@media(max-width:760px){
+  .metrics-main,
+  .metrics-second{
+    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  }
+
+  .load-card{
+    grid-column:auto;
+  }
+}
+</style>
+</head>
+
+<body>
+<main>
+<h1>RyoMonitor</h1>
+<div class="sub" id="subtitle">加载中...</div>
+
+<div class="service-strip">
+  <div class="pill" id="openlist-pill"><span class="dot"></span><span id="openlist">OpenList：--</span></div>
+  <div class="pill" id="caddy-pill"><span class="dot"></span><span id="caddy">Caddy：--</span></div>
+  <div class="pill" id="ssh-pill"><span class="dot"></span><span id="ssh">SSH：--</span></div>
+</div>
+
+<div class="grid metrics-main">
+  <div class="card">
+    <div class="label">CPU</div>
+    <div class="value" id="cpu">--%</div>
+  </div>
+
+  <div class="card">
+    <div class="label">内存</div>
+    <div class="value" id="mem">--%</div>
+    <div class="detail" id="mem-detail">--</div>
+  </div>
+
+  <div class="card">
+    <div class="label">磁盘</div>
+    <div class="value" id="disk">--%</div>
+    <div class="detail" id="disk-detail">--</div>
+  </div>
+
+  <div class="card">
+    <div class="label">网络</div>
+    <div class="value" id="net">--</div>
+  </div>
+</div>
+
+<div class="grid metrics-second">
+  <div class="card">
+    <div class="label">Swap</div>
+    <div class="value" id="swap">--%</div>
+    <div class="detail" id="swap-detail">--</div>
+  </div>
+
+  <div class="card load-card">
+    <div class="label">平均负载</div>
+    <div class="load-detail" id="load">--</div>
+  </div>
+</div>
+
+<div class="table-card">
+<table>
+<thead>
+<tr>
+  <th>PID</th>
+  <th>进程</th>
+  <th>CPU</th>
+  <th>内存</th>
+  <th>实际占用</th>
+</tr>
+</thead>
+<tbody id="processes">
+<tr><td colspan="5">加载中...</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="err" id="error"></div>
+</main>
+
+<script>
+function text(id, value) {
+  document.getElementById(id).textContent = value;
+}
+
+function statusName(value) {
+  if (value === "active") return "运行中";
+  if (value === "inactive") return "已停止";
+  if (value === "failed") return "异常";
+  if (value === "unknown") return "未知";
+  return value || "--";
+}
+
+function pill(service, value) {
+  const el = document.getElementById(service + "-pill");
+  const textEl = document.getElementById(service);
+  const nameMap = {
+    openlist: "OpenList",
+    caddy: "Caddy",
+    ssh: "SSH"
+  };
+
+  textEl.textContent = nameMap[service] + "：" + statusName(value);
+  el.className = "pill " + value;
+}
+
+async function update() {
+  try {
+    const res = await fetch("/status.json?t=" + Date.now(), {cache: "no-store"});
+    if (!res.ok) throw new Error("status.json HTTP " + res.status);
+
+    const s = await res.json();
+
+    text("subtitle", "更新时间：" + s.updated + " · " + s.uptime);
+
+    pill("openlist", s.openlist);
+    pill("caddy", s.caddy);
+    pill("ssh", s.ssh);
+
+    text("cpu", s.cpu + "%");
+
+    text("mem", s.mem_pct + "%");
+    text("mem-detail", "已用 " + s.mem_used + "M\n总计 " + s.mem_total + "M");
+
+    text("disk", s.disk_pct);
+    text("disk-detail", "已用 " + s.disk_used + "\n总计 " + s.disk_total);
+
+    text("net", "↓ " + s.rx_kb + " KB/s\n↑ " + s.tx_kb + " KB/s");
+
+    text("swap", s.swap_pct + "%");
+    text("swap-detail", "已用 " + s.swap_used + "M\n总计 " + s.swap_total + "M");
+
+    text("load",
+      "过去 1 分钟负载：" + s.load1 + "\n" +
+      "过去 5 分钟负载：" + s.load5 + "\n" +
+      "过去 15 分钟负载：" + s.load15
+    );
+
+    document.getElementById("processes").innerHTML = (s.processes || []).map(p => `
+      <tr>
+        <td>${p.pid}</td>
+        <td>${p.name}</td>
+        <td>${p.cpu}%</td>
+        <td>${p.mem}%</td>
+        <td>${p.rss} MB</td>
+      </tr>
+    `).join("") || '<tr><td colspan="5">暂无数据</td></tr>';
+
+    text("error", "");
+  } catch (e) {
+    text("error", String(e));
+  }
+}
+
+update();
+setInterval(update, 1000);
+</script>
+</body>
+</html>
