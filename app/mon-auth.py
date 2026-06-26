@@ -86,6 +86,8 @@ def resolve_static_path(request_path: str) -> Path | None:
     path = unquote(urlparse(request_path).path)
     if path == "/":
         path = "/index.html"
+    if path == "/favicon.svg":
+        path = "/assets/logo.svg"
     candidate = (WEB_ROOT / path.lstrip("/")).resolve()
     if WEB_ROOT not in candidate.parents and candidate != WEB_ROOT:
         return None

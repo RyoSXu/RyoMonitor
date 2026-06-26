@@ -29,8 +29,8 @@ It is built for small servers where a full monitoring stack is more than you nee
 RyoMonitor is intentionally small. On the current VPS deployment:
 
 ```text
-Repository checkout: about 0.4 MB
-Project files without .git: about 0.25 MB
+Repository checkout: about 0.8-0.9 MB
+Project files without .git: about 0.3 MB
 Runtime state file: about 1-2 KB
 Auth gateway memory: about 22 MB RSS
 Collector memory: about 4 MB RSS
@@ -70,7 +70,6 @@ Caddy
 app/index.html              Dashboard UI
 app/mon-auth.py             Password login and static file gateway
 app/assets/logo.svg         Project logo and frontend icon
-app/favicon.svg             Browser favicon
 scripts/ryo-monitor.sh      Metrics collector
 scripts/install.sh          First install helper
 scripts/update.sh           Git pull + restart helper
