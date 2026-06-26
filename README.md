@@ -1,6 +1,8 @@
 # RyoMonitor
 
-RyoMonitor is a small self-hosted server monitor with a dark web dashboard and a local authentication gateway.
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+RyoMonitor is a small self-hosted server monitor with a dark web dashboard, a password login page, and Chinese/English UI switching.
 
 It is designed for a single VPS:
 
@@ -8,6 +10,15 @@ It is designed for a single VPS:
 - A static dashboard reads `status.json`.
 - A Python auth gateway serves the dashboard after password login.
 - Caddy terminates HTTPS and reverse proxies to `127.0.0.1:8090`.
+
+## Features
+
+- Lightweight dashboard for CPU, memory, swap, disk, network, load average, service states, and top processes.
+- Chinese and English display modes for the web UI.
+- Language selection is stored in `localStorage`.
+- Password login with a secure `HttpOnly` cookie.
+- No database or frontend build step.
+- Git-based update workflow for VPS deployments.
 
 ## Files
 
@@ -35,7 +46,7 @@ caddy/Caddyfile.example     Caddy reverse proxy example
 Clone the repository to `/opt/ryo-monitor`:
 
 ```bash
-git clone https://github.com/YOUR_NAME/RyoMonitor.git /opt/ryo-monitor
+git clone https://github.com/RyoSXu/RyoMonitor.git /opt/ryo-monitor
 cd /opt/ryo-monitor
 ```
 

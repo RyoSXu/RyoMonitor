@@ -77,6 +77,7 @@ while true; do
   cat > "$OUT.tmp" <<JSON
 {
   "updated": "$(date '+%Y-%m-%d %H:%M:%S')",
+  "uptime_seconds": "$up_seconds",
   "uptime": "$uptime_text",
 
   "cpu": "$cpu",

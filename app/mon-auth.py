@@ -128,9 +128,9 @@ body {
 }
 .header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   margin: 0 0 20px;
 }
 h1 {
@@ -142,6 +142,31 @@ h1 {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
+}
+.lang-switch{
+  display:inline-flex;
+  gap:4px;
+  padding:3px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--panel-soft);
+  flex:0 0 auto;
+}
+.lang-switch button{
+  height:auto;
+  border:0;
+  border-radius:999px;
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+  font:inherit;
+  font-size:12px;
+  font-weight:400;
+  padding:5px 9px;
+}
+.lang-switch button.active{
+  background:var(--line);
+  color:var(--text);
 }
 .card {
   width: min(100%, 420px);
@@ -220,18 +245,76 @@ button:hover {
   <div class="header">
     <div>
       <h1>RyoMonitor</h1>
-      <p class="sub">请输入访问密码</p>
+      <p class="sub" data-i18n="subtitle">请输入访问密码</p>
+    </div>
+    <div class="lang-switch" aria-label="Language">
+      <button type="button" data-lang="zh">中文</button>
+      <button type="button" data-lang="en">EN</button>
     </div>
   </div>
   <form class="card" method="post" action="/login">
-    <div class="card-title">登录</div>
+    <div class="card-title" data-i18n="login">登录</div>
     <input type="hidden" name="next" value="__NEXT__">
-    <label for="password">访问密码</label>
+    <label for="password" data-i18n="password">访问密码</label>
     <input class="field" id="password" name="password" type="password" autocomplete="current-password" autofocus required>
-    <div class="row"><button type="submit">登录</button></div>
-    <p class="error">__ERROR__</p>
+    <div class="row"><button type="submit" data-i18n="signIn">登录</button></div>
+    <p class="error" data-error-key="__ERROR_KEY__"></p>
   </form>
 </main>
+<script>
+const translations = {
+  zh: {
+    subtitle: "请输入访问密码",
+    login: "登录",
+    password: "访问密码",
+    signIn: "登录",
+    invalidPassword: "密码不正确"
+  },
+  en: {
+    subtitle: "Enter the access password",
+    login: "Sign in",
+    password: "Access password",
+    signIn: "Sign in",
+    invalidPassword: "Incorrect password"
+  }
+};
+
+function initialLanguage() {
+  const saved = localStorage.getItem("ryo-monitor-lang");
+  if (saved === "zh" || saved === "en") return saved;
+  return navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+let currentLang = initialLanguage();
+
+function t(key) {
+  return translations[currentLang][key] || translations.en[key] || key;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-lang]").forEach(button => {
+    button.classList.toggle("active", button.dataset.lang === currentLang);
+  });
+  const error = document.querySelector("[data-error-key]");
+  if (error && error.dataset.errorKey) {
+    error.textContent = t(error.dataset.errorKey);
+  }
+}
+
+document.querySelectorAll("[data-lang]").forEach(button => {
+  button.addEventListener("click", () => {
+    currentLang = button.dataset.lang;
+    localStorage.setItem("ryo-monitor-lang", currentLang);
+    applyLanguage();
+  });
+});
+
+applyLanguage();
+</script>
 </body>
 </html>
 """
@@ -246,7 +329,7 @@ class Handler(BaseHTTPRequestHandler):
     def send_login(self, status=HTTPStatus.OK, error="", next_path="/"):
         body = (
             LOGIN_PAGE
-            .replace("__ERROR__", html.escape(error))
+            .replace("__ERROR_KEY__", html.escape(error))
             .replace("__NEXT__", html.escape(next_path, quote=True))
         ).encode("utf-8")
         self.send_response(status)
@@ -309,7 +392,7 @@ class Handler(BaseHTTPRequestHandler):
             next_path = "/"
         if not verify_password(password):
             time.sleep(0.8)
-            self.send_login(HTTPStatus.UNAUTHORIZED, "密码不正确", next_path)
+            self.send_login(HTTPStatus.UNAUTHORIZED, "invalidPassword", next_path)
             return
         self.send_response(HTTPStatus.SEE_OTHER)
         self.send_header("Location", next_path)

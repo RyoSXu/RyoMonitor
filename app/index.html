@@ -18,6 +18,14 @@ main{
   padding:24px;
 }
 
+.header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:12px;
+}
+
 h1{
   margin:0 0 6px;
   font-size:24px;
@@ -27,6 +35,32 @@ h1{
   color:#aaa;
   margin-bottom:12px;
   font-size:14px;
+}
+
+.lang-switch{
+  display:inline-flex;
+  gap:4px;
+  padding:3px;
+  border:1px solid #333;
+  border-radius:999px;
+  background:#1a1a1a;
+  flex:0 0 auto;
+}
+
+.lang-switch button{
+  border:0;
+  border-radius:999px;
+  background:transparent;
+  color:#aaa;
+  cursor:pointer;
+  font:inherit;
+  font-size:12px;
+  padding:5px 9px;
+}
+
+.lang-switch button.active{
+  background:#333;
+  color:#eee;
 }
 
 .service-strip{
@@ -163,6 +197,10 @@ tbody tr:last-child td{
 }
 
 @media(max-width:760px){
+  main{
+    padding:20px;
+  }
+
   .metrics-main,
   .metrics-second{
     grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
@@ -177,8 +215,16 @@ tbody tr:last-child td{
 
 <body>
 <main>
-<h1>RyoMonitor</h1>
-<div class="sub" id="subtitle">加载中...</div>
+<div class="header">
+  <div>
+    <h1>RyoMonitor</h1>
+    <div class="sub" id="subtitle">加载中...</div>
+  </div>
+  <div class="lang-switch" aria-label="Language">
+    <button type="button" data-lang="zh">中文</button>
+    <button type="button" data-lang="en">EN</button>
+  </div>
+</div>
 
 <div class="service-strip">
   <div class="pill" id="openlist-pill"><span class="dot"></span><span id="openlist">OpenList：--</span></div>
@@ -188,37 +234,37 @@ tbody tr:last-child td{
 
 <div class="grid metrics-main">
   <div class="card">
-    <div class="label">CPU</div>
+    <div class="label" data-i18n="cpu">CPU</div>
     <div class="value" id="cpu">--%</div>
   </div>
 
   <div class="card">
-    <div class="label">内存</div>
+    <div class="label" data-i18n="memory">内存</div>
     <div class="value" id="mem">--%</div>
     <div class="detail" id="mem-detail">--</div>
   </div>
 
   <div class="card">
-    <div class="label">磁盘</div>
+    <div class="label" data-i18n="disk">磁盘</div>
     <div class="value" id="disk">--%</div>
     <div class="detail" id="disk-detail">--</div>
   </div>
 
   <div class="card">
-    <div class="label">网络</div>
+    <div class="label" data-i18n="network">网络</div>
     <div class="value" id="net">--</div>
   </div>
 </div>
 
 <div class="grid metrics-second">
   <div class="card">
-    <div class="label">Swap</div>
+    <div class="label" data-i18n="swap">Swap</div>
     <div class="value" id="swap">--%</div>
     <div class="detail" id="swap-detail">--</div>
   </div>
 
   <div class="card load-card">
-    <div class="label">平均负载</div>
+    <div class="label" data-i18n="loadAverage">平均负载</div>
     <div class="load-detail" id="load">--</div>
   </div>
 </div>
@@ -228,14 +274,14 @@ tbody tr:last-child td{
 <thead>
 <tr>
   <th>PID</th>
-  <th>进程</th>
+  <th data-i18n="process">进程</th>
   <th>CPU</th>
-  <th>内存</th>
-  <th>实际占用</th>
+  <th data-i18n="memory">内存</th>
+  <th data-i18n="rss">实际占用</th>
 </tr>
 </thead>
 <tbody id="processes">
-<tr><td colspan="5">加载中...</td></tr>
+<tr><td colspan="5" data-i18n="loading">加载中...</td></tr>
 </tbody>
 </table>
 </div>
@@ -244,16 +290,118 @@ tbody tr:last-child td{
 </main>
 
 <script>
+const translations = {
+  zh: {
+    loading: "加载中...",
+    updated: "更新时间",
+    cpu: "CPU",
+    memory: "内存",
+    disk: "磁盘",
+    network: "网络",
+    swap: "Swap",
+    loadAverage: "平均负载",
+    process: "进程",
+    rss: "实际占用",
+    used: "已用",
+    total: "总计",
+    oneMinuteLoad: "过去 1 分钟负载",
+    fiveMinuteLoad: "过去 5 分钟负载",
+    fifteenMinuteLoad: "过去 15 分钟负载",
+    noData: "暂无数据",
+    statusActive: "运行中",
+    statusInactive: "已停止",
+    statusFailed: "异常",
+    statusUnknown: "未知",
+    uptimeDay: "天",
+    uptimeHour: "小时",
+    uptimeMinute: "分钟",
+    uptimePrefix: "已运行"
+  },
+  en: {
+    loading: "Loading...",
+    updated: "Updated",
+    cpu: "CPU",
+    memory: "Memory",
+    disk: "Disk",
+    network: "Network",
+    swap: "Swap",
+    loadAverage: "Load average",
+    process: "Process",
+    rss: "RSS",
+    used: "Used",
+    total: "Total",
+    oneMinuteLoad: "1 minute load",
+    fiveMinuteLoad: "5 minute load",
+    fifteenMinuteLoad: "15 minute load",
+    noData: "No data",
+    statusActive: "Running",
+    statusInactive: "Stopped",
+    statusFailed: "Failed",
+    statusUnknown: "Unknown",
+    uptimeDay: "d",
+    uptimeHour: "h",
+    uptimeMinute: "m",
+    uptimePrefix: "Up"
+  }
+};
+
+let currentStatus = null;
+
+function initialLanguage() {
+  const saved = localStorage.getItem("ryo-monitor-lang");
+  if (saved === "zh" || saved === "en") return saved;
+  return navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+let currentLang = initialLanguage();
+
+function t(key) {
+  return translations[currentLang][key] || translations.en[key] || key;
+}
+
 function text(id, value) {
   document.getElementById(id).textContent = value;
 }
 
+function applyStaticText() {
+  document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-lang]").forEach(button => {
+    button.classList.toggle("active", button.dataset.lang === currentLang);
+  });
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem("ryo-monitor-lang", lang);
+  applyStaticText();
+  render(currentStatus);
+}
+
 function statusName(value) {
-  if (value === "active") return "运行中";
-  if (value === "inactive") return "已停止";
-  if (value === "failed") return "异常";
-  if (value === "unknown") return "未知";
+  if (value === "active") return t("statusActive");
+  if (value === "inactive") return t("statusInactive");
+  if (value === "failed") return t("statusFailed");
+  if (value === "unknown") return t("statusUnknown");
   return value || "--";
+}
+
+function formatUptime(seconds, fallback) {
+  if (!Number.isFinite(Number(seconds))) return fallback || "--";
+  const total = Number(seconds);
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (currentLang === "zh") {
+    if (days > 0) return `${t("uptimePrefix")} ${days}${t("uptimeDay")} ${hours}${t("uptimeHour")} ${minutes}${t("uptimeMinute")}`;
+    if (hours > 0) return `${t("uptimePrefix")} ${hours}${t("uptimeHour")} ${minutes}${t("uptimeMinute")}`;
+    return `${t("uptimePrefix")} ${minutes}${t("uptimeMinute")}`;
+  }
+  if (days > 0) return `${t("uptimePrefix")} ${days}${t("uptimeDay")} ${hours}${t("uptimeHour")} ${minutes}${t("uptimeMinute")}`;
+  if (hours > 0) return `${t("uptimePrefix")} ${hours}${t("uptimeHour")} ${minutes}${t("uptimeMinute")}`;
+  return `${t("uptimePrefix")} ${minutes}${t("uptimeMinute")}`;
 }
 
 function pill(service, value) {
@@ -265,58 +413,71 @@ function pill(service, value) {
     ssh: "SSH"
   };
 
-  textEl.textContent = nameMap[service] + "：" + statusName(value);
+  textEl.textContent = nameMap[service] + (currentLang === "zh" ? "：" : ": ") + statusName(value);
   el.className = "pill " + value;
+}
+
+function render(s) {
+  if (!s) {
+    text("subtitle", t("loading"));
+    return;
+  }
+
+  text("subtitle", `${t("updated")}：${s.updated} · ${formatUptime(s.uptime_seconds, s.uptime)}`);
+
+  pill("openlist", s.openlist);
+  pill("caddy", s.caddy);
+  pill("ssh", s.ssh);
+
+  text("cpu", s.cpu + "%");
+
+  text("mem", s.mem_pct + "%");
+  text("mem-detail", `${t("used")} ${s.mem_used}M\n${t("total")} ${s.mem_total}M`);
+
+  text("disk", s.disk_pct);
+  text("disk-detail", `${t("used")} ${s.disk_used}\n${t("total")} ${s.disk_total}`);
+
+  text("net", "↓ " + s.rx_kb + " KB/s\n↑ " + s.tx_kb + " KB/s");
+
+  text("swap", s.swap_pct + "%");
+  text("swap-detail", `${t("used")} ${s.swap_used}M\n${t("total")} ${s.swap_total}M`);
+
+  text("load",
+    `${t("oneMinuteLoad")}：${s.load1}\n` +
+    `${t("fiveMinuteLoad")}：${s.load5}\n` +
+    `${t("fifteenMinuteLoad")}：${s.load15}`
+  );
+
+  document.getElementById("processes").innerHTML = (s.processes || []).map(p => `
+    <tr>
+      <td>${p.pid}</td>
+      <td>${p.name}</td>
+      <td>${p.cpu}%</td>
+      <td>${p.mem}%</td>
+      <td>${p.rss} MB</td>
+    </tr>
+  `).join("") || `<tr><td colspan="5">${t("noData")}</td></tr>`;
+
+  text("error", "");
 }
 
 async function update() {
   try {
     const res = await fetch("/status.json?t=" + Date.now(), {cache: "no-store"});
     if (!res.ok) throw new Error("status.json HTTP " + res.status);
-
-    const s = await res.json();
-
-    text("subtitle", "更新时间：" + s.updated + " · " + s.uptime);
-
-    pill("openlist", s.openlist);
-    pill("caddy", s.caddy);
-    pill("ssh", s.ssh);
-
-    text("cpu", s.cpu + "%");
-
-    text("mem", s.mem_pct + "%");
-    text("mem-detail", "已用 " + s.mem_used + "M\n总计 " + s.mem_total + "M");
-
-    text("disk", s.disk_pct);
-    text("disk-detail", "已用 " + s.disk_used + "\n总计 " + s.disk_total);
-
-    text("net", "↓ " + s.rx_kb + " KB/s\n↑ " + s.tx_kb + " KB/s");
-
-    text("swap", s.swap_pct + "%");
-    text("swap-detail", "已用 " + s.swap_used + "M\n总计 " + s.swap_total + "M");
-
-    text("load",
-      "过去 1 分钟负载：" + s.load1 + "\n" +
-      "过去 5 分钟负载：" + s.load5 + "\n" +
-      "过去 15 分钟负载：" + s.load15
-    );
-
-    document.getElementById("processes").innerHTML = (s.processes || []).map(p => `
-      <tr>
-        <td>${p.pid}</td>
-        <td>${p.name}</td>
-        <td>${p.cpu}%</td>
-        <td>${p.mem}%</td>
-        <td>${p.rss} MB</td>
-      </tr>
-    `).join("") || '<tr><td colspan="5">暂无数据</td></tr>';
-
-    text("error", "");
+    currentStatus = await res.json();
+    render(currentStatus);
   } catch (e) {
     text("error", String(e));
   }
 }
 
+document.querySelectorAll("[data-lang]").forEach(button => {
+  button.addEventListener("click", () => setLanguage(button.dataset.lang));
+});
+
+applyStaticText();
+render(null);
 update();
 setInterval(update, 1000);
 </script>
