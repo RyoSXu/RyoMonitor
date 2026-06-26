@@ -18,6 +18,14 @@ systemctl restart ryo-monitor.service ryo-mon-auth.service
 
 systemctl is-active --quiet ryo-monitor.service
 systemctl is-active --quiet ryo-mon-auth.service
-curl -fsS --max-time 5 http://127.0.0.1:8090/healthz >/dev/null
 
-echo "RyoMonitor updated successfully."
+for _ in $(seq 1 10); do
+  if curl -fsS --max-time 5 http://127.0.0.1:8090/healthz >/dev/null; then
+    echo "RyoMonitor updated successfully."
+    exit 0
+  fi
+  sleep 1
+done
+
+echo "RyoMonitor health check failed." >&2
+exit 1
