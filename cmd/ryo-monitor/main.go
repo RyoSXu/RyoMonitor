@@ -42,6 +42,7 @@ var (
 	secret       []byte
 	iface        string
 	servicesSpec string
+	trustProxy   bool
 )
 
 func env(key, def string) string {
@@ -74,8 +75,15 @@ func loadConfig() {
 		ttl = 7 * 24 * 60 * 60
 	}
 	sessionTTL = ttl
-	passwordHash = mustEnv("MON_AUTH_PASSWORD_HASH")
-	secret = []byte(mustEnv("MON_AUTH_SECRET"))
+	// MON_AUTH_TRUST_PROXY=1：信任前置反代/SSO 已鉴权，本服务跳过内置登录直接服务。
+	trustProxy = os.Getenv("MON_AUTH_TRUST_PROXY") == "1"
+	if trustProxy {
+		passwordHash = os.Getenv("MON_AUTH_PASSWORD_HASH")
+		secret = []byte(os.Getenv("MON_AUTH_SECRET"))
+	} else {
+		passwordHash = mustEnv("MON_AUTH_PASSWORD_HASH")
+		secret = []byte(mustEnv("MON_AUTH_SECRET"))
+	}
 	iface = env("RYO_MONITOR_IFACE", "eth0")
 	servicesSpec = env("RYO_MONITOR_SERVICES", "OpenList=openlist Caddy=caddy SSH=ssh")
 }
@@ -600,7 +608,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			handleLoginPost(w, r)
 			return
 		}
-		if validSession(cookie) {
+		if trustProxy || validSession(cookie) {
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
@@ -620,7 +628,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !validSession(cookie) {
+	if !trustProxy && !validSession(cookie) {
 		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
 		return
 	}
