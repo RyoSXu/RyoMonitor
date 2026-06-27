@@ -360,18 +360,39 @@ func dockerContainerActive(name string) string {
 	return "inactive"
 }
 
-func collectServices() ([]service, string, string, string) {
-	openlist, caddy, ssh := "unknown", "unknown", "unknown"
-	var list []service
-	for _, item := range strings.Fields(servicesSpec) {
+// parseServiceEntries 解析 RYO_MONITOR_SERVICES：每项为「显示名=监控目标」。
+// 监控目标为 systemd 单元名，或 docker:<容器名>。
+// 含逗号/换行时按逗号或换行分隔条目（显示名可包含空格，如 "App Store=docker:asspp"）；
+// 否则回退到按空白分隔，兼容旧的 "OpenList=openlist Caddy=caddy" 写法。
+func parseServiceEntries(spec string) [][2]string {
+	var raw []string
+	if strings.ContainsAny(spec, ",\n") {
+		raw = strings.FieldsFunc(spec, func(r rune) bool { return r == ',' || r == '\n' })
+	} else {
+		raw = strings.Fields(spec)
+	}
+	var out [][2]string
+	for _, item := range raw {
+		item = strings.TrimSpace(item)
 		eq := strings.Index(item, "=")
 		if eq < 0 {
 			continue
 		}
-		name, unit := item[:eq], item[eq+1:]
-		if name == "" || unit == "" || name == unit {
+		name := strings.TrimSpace(item[:eq])
+		unit := strings.TrimSpace(item[eq+1:])
+		if name == "" || unit == "" {
 			continue
 		}
+		out = append(out, [2]string{name, unit})
+	}
+	return out
+}
+
+func collectServices() ([]service, string, string, string) {
+	openlist, caddy, ssh := "unknown", "unknown", "unknown"
+	var list []service
+	for _, entry := range parseServiceEntries(servicesSpec) {
+		name, unit := entry[0], entry[1]
 		var st string
 		if strings.HasPrefix(unit, "docker:") {
 			st = dockerContainerActive(strings.TrimPrefix(unit, "docker:"))

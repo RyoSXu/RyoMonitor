@@ -6,12 +6,53 @@
 <title>RyoMonitor</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="/assets/logo.svg" type="image/svg+xml">
+<script>
+// 尽早设置主题，避免浅色偏好下的深色闪烁（FOUC）。
+(function(){
+  var saved = localStorage.getItem("ryo-monitor-theme");
+  var theme = (saved === "light" || saved === "dark")
+    ? saved
+    : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", theme);
+})();
+</script>
 <style>
+:root{
+  --bg:#111;
+  --fg:#eee;
+  --muted:#aaa;
+  --card:#1b1b1b;
+  --card-alt:#1a1a1a;
+  --border:#333;
+  --pill-fg:#ddd;
+  --btn-hover:#333;
+  --dot-off:#777;
+  --dot-on:#77ff8a;
+  --dot-bad:#ff8a8a;
+  --err:#ff9b9b;
+}
+
+[data-theme="light"]{
+  --bg:#f4f5f7;
+  --fg:#1c1c1e;
+  --muted:#6b7280;
+  --card:#ffffff;
+  --card-alt:#ffffff;
+  --border:#e3e5ea;
+  --pill-fg:#374151;
+  --btn-hover:#eceef2;
+  --dot-off:#9ca3af;
+  --dot-on:#22a559;
+  --dot-bad:#e0564f;
+  --err:#c0392b;
+}
+
 body{
   margin:0;
-  background:#111;
-  color:#eee;
+  background:var(--bg);
+  color:var(--fg);
   font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  transition:background .2s ease,color .2s ease;
 }
 
 main{
@@ -34,35 +75,42 @@ h1{
 }
 
 .sub{
-  color:#aaa;
+  color:var(--muted);
   margin-bottom:12px;
   font-size:14px;
 }
 
-.lang-switch{
-  display:inline-flex;
-  gap:4px;
-  padding:3px;
-  border:1px solid #333;
-  border-radius:999px;
-  background:#1a1a1a;
+.controls{
+  display:flex;
+  gap:8px;
   flex:0 0 auto;
 }
 
-.lang-switch button{
-  border:0;
+.ctrl-btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-width:40px;
+  height:32px;
+  padding:0 12px;
+  border:1px solid var(--border);
   border-radius:999px;
-  background:transparent;
-  color:#aaa;
+  background:var(--card-alt);
+  color:var(--fg);
   cursor:pointer;
   font:inherit;
-  font-size:12px;
-  padding:5px 9px;
+  font-size:13px;
+  line-height:1;
+  transition:background .15s ease,border-color .15s ease;
 }
 
-.lang-switch button.active{
-  background:#333;
-  color:#eee;
+.ctrl-btn:hover{
+  background:var(--btn-hover);
+}
+
+#theme-toggle{
+  font-size:15px;
+  padding:0;
 }
 
 .service-strip{
@@ -77,28 +125,28 @@ h1{
   align-items:center;
   gap:7px;
   padding:6px 10px;
-  border:1px solid #333;
+  border:1px solid var(--border);
   border-radius:999px;
-  background:#1a1a1a;
+  background:var(--card-alt);
   font-size:13px;
-  color:#ddd;
+  color:var(--pill-fg);
 }
 
 .dot{
   width:8px;
   height:8px;
   border-radius:50%;
-  background:#777;
+  background:var(--dot-off);
 }
 
 .pill.active .dot{
-  background:#77ff8a;
+  background:var(--dot-on);
 }
 
 .pill.inactive .dot,
 .pill.failed .dot,
 .pill.unknown .dot{
-  background:#ff8a8a;
+  background:var(--dot-bad);
 }
 
 .grid{
@@ -120,8 +168,8 @@ h1{
 }
 
 .card{
-  background:#1b1b1b;
-  border:1px solid #333;
+  background:var(--card);
+  border:1px solid var(--border);
   border-radius:12px;
   padding:16px;
   box-sizing:border-box;
@@ -129,7 +177,7 @@ h1{
 }
 
 .label{
-  color:#aaa;
+  color:var(--muted);
   font-size:13px;
   margin-bottom:8px;
 }
@@ -146,7 +194,7 @@ h1{
   font-size:14px;
   font-weight:600;
   line-height:1.45;
-  color:#eee;
+  color:var(--fg);
   white-space:pre-line;
 }
 
@@ -159,8 +207,8 @@ h1{
 
 .table-card{
   margin-top:20px;
-  background:#1b1b1b;
-  border:1px solid #333;
+  background:var(--card);
+  border:1px solid var(--border);
   border-radius:12px;
   overflow:hidden;
   box-sizing:border-box;
@@ -173,18 +221,18 @@ h1{
   border-radius:0;
   border-collapse:separate;
   border-spacing:0;
-  background:#1b1b1b;
+  background:var(--card);
 }
 
 th,td{
   padding:10px;
-  border-bottom:1px solid #333;
+  border-bottom:1px solid var(--border);
   text-align:left;
   font-size:13px;
 }
 
 th{
-  color:#aaa;
+  color:var(--muted);
   font-weight:500;
 }
 
@@ -193,7 +241,7 @@ tbody tr:last-child td{
 }
 
 .err{
-  color:#ff9b9b;
+  color:var(--err);
   margin-top:16px;
   font-size:13px;
 }
@@ -222,9 +270,9 @@ tbody tr:last-child td{
     <h1>RyoMonitor</h1>
     <div class="sub" id="subtitle">加载中...</div>
   </div>
-  <div class="lang-switch" aria-label="Language">
-    <button type="button" data-lang="zh">中文</button>
-    <button type="button" data-lang="en">EN</button>
+  <div class="controls">
+    <button type="button" id="lang-toggle" class="ctrl-btn" aria-label="Language">中文</button>
+    <button type="button" id="theme-toggle" class="ctrl-btn" aria-label="Theme">☾</button>
   </div>
 </div>
 
@@ -368,9 +416,9 @@ function applyStaticText() {
   document.querySelectorAll("[data-i18n]").forEach(el => {
     el.textContent = t(el.dataset.i18n);
   });
-  document.querySelectorAll("[data-lang]").forEach(button => {
-    button.classList.toggle("active", button.dataset.lang === currentLang);
-  });
+  // 单按钮显示当前语言，点击切换到另一种。
+  const langBtn = document.getElementById("lang-toggle");
+  if (langBtn) langBtn.textContent = currentLang === "zh" ? "中文" : "EN";
 }
 
 function setLanguage(lang) {
@@ -378,6 +426,31 @@ function setLanguage(lang) {
   localStorage.setItem("ryo-monitor-lang", lang);
   applyStaticText();
   render(currentStatus);
+}
+
+// ---------- 主题（明暗）----------
+
+function initialTheme() {
+  const saved = localStorage.getItem("ryo-monitor-theme");
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+let currentTheme = initialTheme();
+
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", currentTheme);
+  const btn = document.getElementById("theme-toggle");
+  if (btn) {
+    btn.textContent = currentTheme === "dark" ? "☾" : "☀";
+    btn.setAttribute("aria-label", currentTheme === "dark" ? "Switch to light theme" : "Switch to dark theme");
+  }
+}
+
+function toggleTheme() {
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
+  localStorage.setItem("ryo-monitor-theme", currentTheme);
+  applyTheme();
 }
 
 function statusName(value) {
@@ -415,16 +488,25 @@ function serviceList(s) {
   ];
 }
 
+function escapeAttr(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 function renderServices(services) {
   const strip = document.querySelector(".service-strip");
   strip.innerHTML = services.map(service => {
-    const safeName = String(service.name || service.unit || "--")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;");
+    const safeName = escapeAttr(service.name || service.unit || "--");
     const status = service.status || "unknown";
-    return `<div class="pill ${status}"><span class="dot"></span><span>${safeName}${currentLang === "zh" ? "：" : ": "}${statusName(status)}</span></div>`;
+    // 仅用左侧指示灯表示运行状态，名称旁不再显示状态文字；
+    // hover 提示显示「监控目标 · 状态文字」，让卡片自解释。
+    const tip = service.unit
+      ? `${escapeAttr(service.unit)} · ${statusName(status)}`
+      : statusName(status);
+    return `<div class="pill ${status}" title="${tip}"><span class="dot"></span><span>${safeName}</span></div>`;
   }).join("") || `<div class="pill unknown"><span class="dot"></span><span>${t("noData")}</span></div>`;
 }
 
@@ -481,10 +563,12 @@ async function update() {
   }
 }
 
-document.querySelectorAll("[data-lang]").forEach(button => {
-  button.addEventListener("click", () => setLanguage(button.dataset.lang));
+document.getElementById("lang-toggle").addEventListener("click", () => {
+  setLanguage(currentLang === "zh" ? "en" : "zh");
 });
+document.getElementById("theme-toggle").addEventListener("click", toggleTheme);
 
+applyTheme();
 applyStaticText();
 render(null);
 update();
