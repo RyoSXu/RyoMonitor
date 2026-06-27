@@ -6,7 +6,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-RyoMonitor is a lightweight self-hosted VPS monitor with a dark dashboard, password login, and zero build step.
+RyoMonitor is a lightweight self-hosted VPS monitor with a dark dashboard, password login, and no frontend build step.
 
 It is built for small servers where a full monitoring stack is more than you need.
 
@@ -16,7 +16,7 @@ It is built for small servers where a full monitoring stack is more than you nee
 
 ## Why RyoMonitor
 
-- Lightweight Bash + Python runtime
+- Single Go binary, standard library only, no runtime deps
 - No database
 - No frontend build step
 - Single VPS deployment
@@ -29,11 +29,9 @@ It is built for small servers where a full monitoring stack is more than you nee
 RyoMonitor is intentionally small. On the current VPS deployment:
 
 ```text
-Repository checkout: about 0.8-0.9 MB
-Project files without .git: about 0.3 MB
-Runtime state file: about 1-2 KB
-Auth gateway memory: about 22 MB RSS
-Collector memory: about 4 MB RSS
+Binary size: about 6.4 MB
+Runtime memory: about 12 MB RSS (single Go process: collector + auth gateway + static)
+status.json: served from memory, never written to disk
 Database: none
 Frontend build: none
 ```
