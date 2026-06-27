@@ -30,6 +30,8 @@
   --dot-on:#77ff8a;
   --dot-bad:#ff8a8a;
   --err:#ff9b9b;
+  --net-rx:#4ea1ff;
+  --net-tx:#5ad19b;
 }
 
 [data-theme="light"]{
@@ -45,6 +47,8 @@
   --dot-on:#22a559;
   --dot-bad:#e0564f;
   --err:#c0392b;
+  --net-rx:#2f74c0;
+  --net-tx:#1f9d6b;
 }
 
 body{
@@ -205,6 +209,118 @@ h1{
   white-space:pre-line;
 }
 
+/* 细条进度条：嵌在卡片内部，不改变卡片尺寸 */
+.bar{
+  height:6px;
+  margin-top:10px;
+  border-radius:999px;
+  background:var(--border);
+  overflow:hidden;
+}
+
+.bar > span{
+  display:block;
+  height:100%;
+  width:0;
+  border-radius:999px;
+  background:var(--dot-on);
+  transition:width .45s ease,background .3s ease;
+}
+
+.bar.warn > span{background:#e0a23b;}
+.bar.crit > span{background:var(--dot-bad);}
+
+/* 网络迷你折线图（下行/上行随时间，自动缩放） */
+.net-value{
+  display:flex;
+  gap:12px;
+  font-size:18px;
+}
+
+.net-value .rx{color:var(--net-rx);}
+.net-value .tx{color:var(--net-tx);}
+
+.spark{
+  display:block;
+  width:100%;
+  height:42px;
+  margin-top:10px;
+  overflow:visible;
+}
+
+.spark path{
+  fill:none;
+  stroke-width:1.5;
+  vector-effect:non-scaling-stroke;
+}
+
+.spark .spark-rx{stroke:var(--net-rx);}
+.spark .spark-tx{stroke:var(--net-tx);}
+
+/* 平均负载：三行归一化（load / 核数）横条 */
+.load-rows{
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+  margin-top:4px;
+}
+
+.load-row{
+  display:grid;
+  grid-template-columns:4em 1fr auto;
+  align-items:center;
+  gap:12px;
+}
+
+.load-name{
+  color:var(--muted);
+  font-size:13px;
+  white-space:nowrap;
+}
+
+.load-bar{
+  margin-top:0;
+}
+
+.load-num{
+  font-size:14px;
+  font-weight:600;
+  font-variant-numeric:tabular-nums;
+  min-width:3ch;
+  text-align:right;
+}
+
+/* 与 UI 一致的自定义悬浮提示：替代原生 title，hover 立即显示 */
+.tooltip{
+  position:fixed;
+  z-index:50;
+  pointer-events:none;
+  background:var(--card);
+  color:var(--fg);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:7px 10px;
+  font-size:12px;
+  line-height:1.5;
+  box-shadow:0 6px 20px rgba(0,0,0,.28);
+  opacity:0;
+  transform:translateY(3px);
+  transition:opacity .12s ease,transform .12s ease;
+  white-space:nowrap;
+  max-width:280px;
+}
+
+.tooltip.show{
+  opacity:1;
+  transform:translateY(0);
+}
+
+.tooltip .tt-unit{
+  color:var(--muted);
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:11px;
+}
+
 .table-card{
   margin-top:20px;
   background:var(--card);
@@ -284,23 +400,30 @@ tbody tr:last-child td{
   <div class="card">
     <div class="label" data-i18n="cpu">CPU</div>
     <div class="value" id="cpu">--%</div>
+    <div class="bar" id="cpu-bar"><span></span></div>
   </div>
 
   <div class="card">
     <div class="label" data-i18n="memory">内存</div>
     <div class="value" id="mem">--%</div>
+    <div class="bar" id="mem-bar"><span></span></div>
     <div class="detail" id="mem-detail">--</div>
   </div>
 
   <div class="card">
     <div class="label" data-i18n="disk">磁盘</div>
     <div class="value" id="disk">--%</div>
+    <div class="bar" id="disk-bar"><span></span></div>
     <div class="detail" id="disk-detail">--</div>
   </div>
 
   <div class="card">
     <div class="label" data-i18n="network">网络</div>
-    <div class="value" id="net">--</div>
+    <div class="value net-value" id="net">--</div>
+    <svg class="spark" id="net-spark" viewBox="0 0 100 42" preserveAspectRatio="none" aria-hidden="true">
+      <path class="spark-rx" id="net-spark-rx"></path>
+      <path class="spark-tx" id="net-spark-tx"></path>
+    </svg>
   </div>
 </div>
 
@@ -308,12 +431,29 @@ tbody tr:last-child td{
   <div class="card">
     <div class="label" data-i18n="swap">Swap</div>
     <div class="value" id="swap">--%</div>
+    <div class="bar" id="swap-bar"><span></span></div>
     <div class="detail" id="swap-detail">--</div>
   </div>
 
   <div class="card load-card">
     <div class="label" data-i18n="loadAverage">平均负载</div>
-    <div class="load-detail" id="load">--</div>
+    <div class="load-rows">
+      <div class="load-row">
+        <span class="load-name" data-i18n="load1m">1 分钟</span>
+        <div class="bar load-bar" id="load1-bar"><span></span></div>
+        <span class="load-num" id="load1-num">--</span>
+      </div>
+      <div class="load-row">
+        <span class="load-name" data-i18n="load5m">5 分钟</span>
+        <div class="bar load-bar" id="load5-bar"><span></span></div>
+        <span class="load-num" id="load5-num">--</span>
+      </div>
+      <div class="load-row">
+        <span class="load-name" data-i18n="load15m">15 分钟</span>
+        <div class="bar load-bar" id="load15-bar"><span></span></div>
+        <span class="load-num" id="load15-num">--</span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -355,6 +495,9 @@ const translations = {
     oneMinuteLoad: "过去 1 分钟负载",
     fiveMinuteLoad: "过去 5 分钟负载",
     fifteenMinuteLoad: "过去 15 分钟负载",
+    load1m: "1 分钟",
+    load5m: "5 分钟",
+    load15m: "15 分钟",
     noData: "暂无数据",
     statusActive: "运行中",
     statusInactive: "已停止",
@@ -381,6 +524,9 @@ const translations = {
     oneMinuteLoad: "1 minute load",
     fiveMinuteLoad: "5 minute load",
     fifteenMinuteLoad: "15 minute load",
+    load1m: "1 min",
+    load5m: "5 min",
+    load15m: "15 min",
     noData: "No data",
     statusActive: "Running",
     statusInactive: "Stopped",
@@ -409,6 +555,69 @@ function t(key) {
 
 function text(id, value) {
   document.getElementById(id).textContent = value;
+}
+
+// 设置卡片内细条进度：宽度按百分比，颜色按阈值分级（绿 / 黄 / 红）。
+function setBar(id, raw) {
+  const bar = document.getElementById(id);
+  if (!bar) return;
+  const pct = Math.max(0, Math.min(100, parseFloat(raw)));
+  const fill = bar.firstElementChild;
+  if (!Number.isFinite(pct)) {
+    fill.style.width = "0%";
+    return;
+  }
+  fill.style.width = pct + "%";
+  bar.classList.toggle("warn", pct >= 70 && pct < 90);
+  bar.classList.toggle("crit", pct >= 90);
+}
+
+// 平均负载条：按 load/核数 归一化（每核 1.0 = 满载 100%）。
+function setLoad(barId, numId, raw, cores) {
+  text(numId, raw);
+  const v = parseFloat(raw);
+  setBar(barId, Number.isFinite(v) ? (v / cores) * 100 : NaN);
+}
+
+// ---------- 网络迷你折线图 ----------
+
+const NET_HISTORY = 60; // 保留最近 60 个采样点（约 1 分钟）
+const netRxHist = [];
+const netTxHist = [];
+
+function pushHistory(arr, value) {
+  arr.push(Number.isFinite(value) ? value : 0);
+  if (arr.length > NET_HISTORY) arr.shift();
+}
+
+// 将一组数值映射为 SVG path（viewBox 100 x 42，自动按共享峰值缩放）。
+function sparkPath(arr, max) {
+  if (arr.length < 2) return "";
+  const w = 100, h = 42, pad = 3;
+  const span = h - pad * 2;
+  const denom = max > 0 ? max : 1;
+  const stepX = w / (NET_HISTORY - 1);
+  // 右对齐：最新点贴在最右侧，历史向左延伸。
+  const offset = w - (arr.length - 1) * stepX;
+  let d = "";
+  for (let i = 0; i < arr.length; i++) {
+    const x = offset + i * stepX;
+    const y = h - pad - (arr[i] / denom) * span;
+    d += (i === 0 ? "M" : "L") + x.toFixed(2) + " " + y.toFixed(2) + " ";
+  }
+  return d.trim();
+}
+
+function renderNetwork(rxKb, txKb) {
+  const rx = parseFloat(rxKb), tx = parseFloat(txKb);
+  document.getElementById("net").innerHTML =
+    `<span class="rx">↓ ${rxKb}</span><span class="tx">↑ ${txKb} KB/s</span>`;
+  pushHistory(netRxHist, rx);
+  pushHistory(netTxHist, tx);
+  // 下行/上行共享同一纵轴峰值，便于直接比较两条线的相对大小。
+  const max = Math.max(1, ...netRxHist, ...netTxHist);
+  document.getElementById("net-spark-rx").setAttribute("d", sparkPath(netRxHist, max));
+  document.getElementById("net-spark-tx").setAttribute("d", sparkPath(netTxHist, max));
 }
 
 function applyStaticText() {
@@ -496,17 +705,21 @@ function escapeAttr(value) {
     .replaceAll('"', "&quot;");
 }
 
+let lastServicesSig = "";
+
 function renderServices(services) {
   const strip = document.querySelector(".service-strip");
+  // 仅在服务清单/状态变化时重建 DOM：避免每秒刷新打断 hover 提示，也省去无谓重绘。
+  const sig = currentLang + "|" + services.map(s => `${s.name}:${s.unit}:${s.status}`).join(",");
+  if (sig === lastServicesSig) return;
+  lastServicesSig = sig;
   strip.innerHTML = services.map(service => {
     const safeName = escapeAttr(service.name || service.unit || "--");
     const status = service.status || "unknown";
     // 仅用左侧指示灯表示运行状态，名称旁不再显示状态文字；
-    // hover 提示显示「监控目标 · 状态文字」，让卡片自解释。
-    const tip = service.unit
-      ? `${escapeAttr(service.unit)} · ${statusName(status)}`
-      : statusName(status);
-    return `<div class="pill ${status}" title="${tip}"><span class="dot"></span><span>${safeName}</span></div>`;
+    // hover 用自定义提示（见 tooltip）显示「状态」+「监控目标」，与 UI 一致且即时弹出。
+    const unitAttr = service.unit ? ` data-unit="${escapeAttr(service.unit)}"` : "";
+    return `<div class="pill ${status}" data-status="${escapeAttr(status)}"${unitAttr}><span class="dot"></span><span>${safeName}</span></div>`;
   }).join("") || `<div class="pill unknown"><span class="dot"></span><span>${t("noData")}</span></div>`;
 }
 
@@ -521,23 +734,26 @@ function render(s) {
   renderServices(serviceList(s));
 
   text("cpu", s.cpu + "%");
+  setBar("cpu-bar", s.cpu);
 
   text("mem", s.mem_pct + "%");
-  text("mem-detail", `${t("used")} ${s.mem_used}M\n${t("total")} ${s.mem_total}M`);
+  setBar("mem-bar", s.mem_pct);
+  text("mem-detail", `${t("used")} ${s.mem_used}M · ${t("total")} ${s.mem_total}M`);
 
   text("disk", s.disk_pct);
-  text("disk-detail", `${t("used")} ${s.disk_used}\n${t("total")} ${s.disk_total}`);
+  setBar("disk-bar", s.disk_pct);
+  text("disk-detail", `${t("used")} ${s.disk_used} · ${t("total")} ${s.disk_total}`);
 
-  text("net", "↓ " + s.rx_kb + " KB/s\n↑ " + s.tx_kb + " KB/s");
+  renderNetwork(s.rx_kb, s.tx_kb);
 
   text("swap", s.swap_pct + "%");
-  text("swap-detail", `${t("used")} ${s.swap_used}M\n${t("total")} ${s.swap_total}M`);
+  setBar("swap-bar", s.swap_pct);
+  text("swap-detail", `${t("used")} ${s.swap_used}M · ${t("total")} ${s.swap_total}M`);
 
-  text("load",
-    `${t("oneMinuteLoad")}：${s.load1}\n` +
-    `${t("fiveMinuteLoad")}：${s.load5}\n` +
-    `${t("fifteenMinuteLoad")}：${s.load15}`
-  );
+  const cores = Number(s.cores) || 1;
+  setLoad("load1-bar", "load1-num", s.load1, cores);
+  setLoad("load5-bar", "load5-num", s.load5, cores);
+  setLoad("load15-bar", "load15-num", s.load15, cores);
 
   document.getElementById("processes").innerHTML = (s.processes || []).map(p => `
     <tr>
@@ -562,6 +778,57 @@ async function update() {
     text("error", String(e));
   }
 }
+
+// ---------- 自定义悬浮提示（替代原生 title，即时弹出）----------
+
+const tooltipEl = document.createElement("div");
+tooltipEl.className = "tooltip";
+tooltipEl.setAttribute("role", "tooltip");
+document.body.appendChild(tooltipEl);
+
+let tipAnchor = null;
+
+function buildTipHTML(pill) {
+  // 状态已由胶囊左侧指示灯表达，提示只显示监控目标本身。
+  const unit = pill.dataset.unit || "";
+  return `<div class="tt-unit">${escapeAttr(unit)}</div>`;
+}
+
+function positionTip() {
+  if (!tipAnchor) return;
+  const r = tipAnchor.getBoundingClientRect();
+  const tw = tooltipEl.offsetWidth;
+  const gap = 8;
+  let left = r.left + r.width / 2 - tw / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+  // 固定显示在胶囊下方。
+  tooltipEl.style.left = left + "px";
+  tooltipEl.style.top = (r.bottom + gap) + "px";
+}
+
+function showTip(pill) {
+  if (!pill.dataset.unit) return; // 无监控目标则不弹提示
+  tipAnchor = pill;
+  tooltipEl.innerHTML = buildTipHTML(pill);
+  positionTip();
+  tooltipEl.classList.add("show");
+}
+
+function hideTip() {
+  tipAnchor = null;
+  tooltipEl.classList.remove("show");
+}
+
+document.addEventListener("mouseover", e => {
+  const pill = e.target.closest && e.target.closest(".pill[data-status]");
+  if (pill) showTip(pill);
+});
+document.addEventListener("mouseout", e => {
+  const pill = e.target.closest && e.target.closest(".pill[data-status]");
+  if (pill && !pill.contains(e.relatedTarget)) hideTip();
+});
+window.addEventListener("scroll", hideTip, true);
+window.addEventListener("resize", hideTip);
 
 document.getElementById("lang-toggle").addEventListener("click", () => {
   setLanguage(currentLang === "zh" ? "en" : "zh");

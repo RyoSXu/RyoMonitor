@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -223,6 +224,7 @@ type status struct {
 	Load1         string    `json:"load1"`
 	Load5         string    `json:"load5"`
 	Load15        string    `json:"load15"`
+	Cores         int       `json:"cores"`
 	OpenList      string    `json:"openlist"`
 	Caddy         string    `json:"caddy"`
 	SSH           string    `json:"ssh"`
@@ -565,6 +567,7 @@ func collectOnce(prevRx, prevTx, prevTotal, prevIdle uint64) (status, uint64, ui
 		Load1:         l1,
 		Load5:         l5,
 		Load15:        l15,
+		Cores:         runtime.NumCPU(),
 		OpenList:      openlist,
 		Caddy:         caddy,
 		SSH:           ssh,
