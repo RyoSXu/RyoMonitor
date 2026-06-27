@@ -2,6 +2,7 @@
 set -euo pipefail
 
 PROJECT_DIR="${PROJECT_DIR:-/opt/ryo-monitor}"
+BIN="$PROJECT_DIR/bin/ryo-monitor"
 
 cd "$PROJECT_DIR"
 
@@ -9,15 +10,17 @@ if command -v git >/dev/null 2>&1 && [ -d .git ]; then
   git pull --ff-only
 fi
 
-python3 -m py_compile app/mon-auth.py
-bash -n scripts/ryo-monitor.sh
+if command -v go >/dev/null 2>&1; then
+  CGO_ENABLED=0 go build -ldflags='-s -w' -o "$BIN" ./cmd/ryo-monitor
+else
+  docker run --rm -v "$PROJECT_DIR":/src -w /src golang:1-alpine \
+    sh -c "CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/ryo-monitor ./cmd/ryo-monitor"
+fi
 
-chmod 0755 app/mon-auth.py scripts/ryo-monitor.sh
+install -m 0644 systemd/ryo-monitor.service /etc/systemd/system/ryo-monitor.service
 systemctl daemon-reload
-systemctl restart ryo-monitor.service ryo-mon-auth.service
-
+systemctl restart ryo-monitor.service
 systemctl is-active --quiet ryo-monitor.service
-systemctl is-active --quiet ryo-mon-auth.service
 
 for _ in $(seq 1 10); do
   if curl -fsS --max-time 5 http://127.0.0.1:8090/healthz >/dev/null; then

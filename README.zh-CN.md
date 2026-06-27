@@ -52,28 +52,29 @@ RyoMonitor 刻意保持小体积。当前 VPS 部署的实测量级：
 
 ```text
 ryo-monitor.service
-  -> scripts/ryo-monitor.sh
-  -> app/status.json
-
-ryo-mon-auth.service
-  -> app/mon-auth.py
-  -> 密码登录 + 静态看板
+  -> bin/ryo-monitor (单个 Go 二进制)
+       后台 goroutine: 每秒采集指标到内存
+       HTTP 服务: 密码登录 + 静态看板 + /status.json
 
 Caddy
   -> HTTPS
   -> reverse_proxy 127.0.0.1:8090
 ```
 
+> v2 起后端由 Go 重写：采集器与鉴权网关合并为单个二进制、单个 systemd 服务，
+> 不再依赖 Python / Bash，status.json 直接从内存提供（不落盘）。
+
 ## 文件结构
 
 ```text
 app/index.html              监控看板 UI
-app/mon-auth.py             密码登录和静态文件网关
 app/assets/logo.svg         项目 logo 和前端图标
-scripts/ryo-monitor.sh      指标采集脚本
+cmd/ryo-monitor/main.go     后端：采集器 + 鉴权网关（Go）
+cmd/ryo-monitor/login.html  登录页（编译进二进制）
+bin/ryo-monitor             构建产物（不入库）
 scripts/install.sh          首次安装脚本
-scripts/update.sh           git pull + 重启脚本
-systemd/*.service           systemd 服务模板
+scripts/update.sh           git pull + 重新构建 + 重启脚本
+systemd/ryo-monitor.service systemd 服务模板
 caddy/Caddyfile.example     Caddy 反代示例
 docs/screenshot.png         看板截图
 .env.example                环境变量示例
@@ -82,10 +83,24 @@ docs/screenshot.png         看板截图
 ## 运行要求
 
 - 使用 systemd 的 Linux VPS
-- Python 3.10+
-- Bash
 - Caddy
 - Git，用于 GitHub 同步更新
+- 构建后端需要 Go 1.22+（本机安装，或用 Docker `golang:1-alpine` 构建，无需污染系统）
+
+## 构建
+
+本机有 Go：
+
+```bash
+CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/ryo-monitor ./cmd/ryo-monitor
+```
+
+或用 Docker 构建（无需本机装 Go）：
+
+```bash
+docker run --rm -v "$PWD":/src -w /src golang:1-alpine \
+  sh -c "CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/ryo-monitor ./cmd/ryo-monitor"
+```
 
 ## 安装
 
@@ -136,17 +151,11 @@ cd /opt/ryo-monitor
 bash scripts/update.sh
 ```
 
-更新脚本会执行 `git pull --ff-only`，检查 Python 和 Bash 语法，重启两个服务，并检查认证网关健康状态。
+更新脚本会执行 `git pull --ff-only`，重新构建 Go 二进制，重启服务并检查健康状态。
 
 ## 配置
 
-认证环境变量：
-
-```text
-/etc/ryo-mon-auth.env
-```
-
-可选采集配置：
+所有环境变量集中在一个文件（安装脚本会用 `bin/ryo-monitor genenv <密码>` 自动生成）：
 
 ```text
 /etc/ryo-monitor.env
@@ -155,7 +164,12 @@ bash scripts/update.sh
 示例：
 
 ```bash
-RYO_MONITOR_STATUS_FILE=/opt/ryo-monitor/app/status.json
+MON_AUTH_HOST=127.0.0.1
+MON_AUTH_PORT=8090
+MON_AUTH_WEB_ROOT=/opt/ryo-monitor/app
+MON_AUTH_SESSION_TTL=604800
+MON_AUTH_PASSWORD_HASH=pbkdf2_sha256$260000$<salt>$<hash>
+MON_AUTH_SECRET=<random>
 RYO_MONITOR_IFACE=eth0
 RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh"
 ```
@@ -183,7 +197,7 @@ systemctl is-active <unit>
 ## 安全建议
 
 - 不要泄露 `MON_AUTH_SECRET`。
-- 不要把 `/etc/ryo-mon-auth.env` 提交到 Git。
+- 不要把 `/etc/ryo-monitor.env` 提交到 Git。
 - 认证网关只绑定 `127.0.0.1`。
 - 只通过 Caddy HTTPS 暴露监控面板。
-- 如需轮换密码，重新生成 `/etc/ryo-mon-auth.env` 并重启 `ryo-mon-auth.service`。
+- 如需轮换密码，重新生成 `/etc/ryo-monitor.env` 并重启 `ryo-monitor.service`。

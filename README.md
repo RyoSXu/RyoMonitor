@@ -52,28 +52,30 @@ Frontend build: none
 
 ```text
 ryo-monitor.service
-  -> scripts/ryo-monitor.sh
-  -> app/status.json
-
-ryo-mon-auth.service
-  -> app/mon-auth.py
-  -> password login + static dashboard
+  -> bin/ryo-monitor (single Go binary)
+       background goroutine: collect metrics into memory every second
+       HTTP server: password login + static dashboard + /status.json
 
 Caddy
   -> HTTPS
   -> reverse_proxy 127.0.0.1:8090
 ```
 
+> Since v2 the backend is rewritten in Go: the collector and the auth gateway are
+> merged into a single binary and a single systemd service, with no Python / Bash
+> dependency. status.json is served straight from memory (never written to disk).
+
 ## Files
 
 ```text
 app/index.html              Dashboard UI
-app/mon-auth.py             Password login and static file gateway
 app/assets/logo.svg         Project logo and frontend icon
-scripts/ryo-monitor.sh      Metrics collector
+cmd/ryo-monitor/main.go     Backend: collector + auth gateway (Go)
+cmd/ryo-monitor/login.html  Login page (embedded into the binary)
+bin/ryo-monitor             Build output (git-ignored)
 scripts/install.sh          First install helper
-scripts/update.sh           Git pull + restart helper
-systemd/*.service           systemd unit templates
+scripts/update.sh           Git pull + rebuild + restart helper
+systemd/ryo-monitor.service systemd unit template
 caddy/Caddyfile.example     Caddy reverse proxy example
 docs/screenshot.png         Dashboard screenshot
 .env.example                Example environment variables
@@ -82,10 +84,24 @@ docs/screenshot.png         Dashboard screenshot
 ## Requirements
 
 - Linux VPS with systemd
-- Python 3.10+
-- Bash
 - Caddy
 - Git, if you want GitHub-based updates
+- Go 1.22+ to build the backend (installed locally, or build with the Docker `golang:1-alpine` image)
+
+## Build
+
+With Go installed locally:
+
+```bash
+CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/ryo-monitor ./cmd/ryo-monitor
+```
+
+Or build with Docker (no local Go needed):
+
+```bash
+docker run --rm -v "$PWD":/src -w /src golang:1-alpine \
+  sh -c "CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/ryo-monitor ./cmd/ryo-monitor"
+```
 
 ## Install
 
@@ -105,7 +121,7 @@ DOMAIN=mon.example.com bash scripts/install.sh
 The installer asks for a login password and writes a hashed password plus a random signing secret to:
 
 ```text
-/etc/ryo-mon-auth.env
+/etc/ryo-monitor.env
 ```
 
 Do not commit that file.
@@ -136,17 +152,11 @@ cd /opt/ryo-monitor
 bash scripts/update.sh
 ```
 
-The update script runs `git pull --ff-only`, checks Python and Bash syntax, restarts both services, and checks the auth gateway health endpoint.
+The update script runs `git pull --ff-only`, rebuilds the Go binary, restarts the service, and checks the health endpoint.
 
 ## Configuration
 
-Authentication environment:
-
-```text
-/etc/ryo-mon-auth.env
-```
-
-Optional collector environment:
+All environment variables live in a single file (the installer generates it with `bin/ryo-monitor genenv <password>`):
 
 ```text
 /etc/ryo-monitor.env
@@ -155,7 +165,12 @@ Optional collector environment:
 Example:
 
 ```bash
-RYO_MONITOR_STATUS_FILE=/opt/ryo-monitor/app/status.json
+MON_AUTH_HOST=127.0.0.1
+MON_AUTH_PORT=8090
+MON_AUTH_WEB_ROOT=/opt/ryo-monitor/app
+MON_AUTH_SESSION_TTL=604800
+MON_AUTH_PASSWORD_HASH=pbkdf2_sha256$260000$<salt>$<hash>
+MON_AUTH_SECRET=<random>
 RYO_MONITOR_IFACE=eth0
 RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh"
 ```
@@ -183,7 +198,7 @@ systemctl is-active <unit>
 ## Security Notes
 
 - Keep `MON_AUTH_SECRET` private.
-- Keep `/etc/ryo-mon-auth.env` out of Git.
+- Keep `/etc/ryo-monitor.env` out of Git.
 - Bind the auth gateway to `127.0.0.1`.
 - Expose the dashboard only through Caddy HTTPS.
-- Rotate the password by regenerating `/etc/ryo-mon-auth.env` and restarting `ryo-mon-auth.service`.
+- Rotate the password by regenerating `/etc/ryo-monitor.env` and restarting `ryo-monitor.service`.

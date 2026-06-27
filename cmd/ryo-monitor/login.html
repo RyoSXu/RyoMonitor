@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RyoMonitor</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/assets/logo.svg" type="image/svg+xml">
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #111;
+  --panel: #1b1b1b;
+  --panel-soft: #1a1a1a;
+  --text: #eee;
+  --muted: #aaa;
+  --line: #333;
+  --accent: #77ff8a;
+  --accent-strong: #5fe873;
+  --danger: #ff8a8a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+.shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 20px;
+}
+h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+  line-height: 1.2;
+}
+.sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.lang-switch{
+  display:inline-flex;
+  gap:4px;
+  padding:3px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--panel-soft);
+  flex:0 0 auto;
+}
+.lang-switch button{
+  height:auto;
+  border:0;
+  border-radius:999px;
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+  font:inherit;
+  font-size:12px;
+  font-weight:400;
+  padding:5px 9px;
+}
+.lang-switch button.active{
+  background:var(--line);
+  color:var(--text);
+}
+.card {
+  width: min(100%, 420px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 16px;
+  min-height: 118px;
+}
+.card-title {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+}
+label {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.field {
+  width: 100%;
+  height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font: inherit;
+  padding: 0 13px;
+  outline: none;
+}
+.field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(119,255,138,.12);
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin-top: 16px;
+}
+button {
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  padding: 0 20px;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--accent);
+}
+.error {
+  min-height: 20px;
+  margin: 13px 0 0;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+}
+@media(max-width:760px){
+  .shell{
+    padding: 20px;
+  }
+
+  .card{
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+<main class="shell">
+  <div class="header">
+    <div>
+      <h1>RyoMonitor</h1>
+      <p class="sub" data-i18n="subtitle">请输入访问密码</p>
+    </div>
+    <div class="lang-switch" aria-label="Language">
+      <button type="button" data-lang="zh">中文</button>
+      <button type="button" data-lang="en">EN</button>
+    </div>
+  </div>
+  <form class="card" method="post" action="/login">
+    <div class="card-title" data-i18n="login">登录</div>
+    <input type="hidden" name="next" value="__NEXT__">
+    <label for="password" data-i18n="password">访问密码</label>
+    <input class="field" id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+    <div class="row"><button type="submit" data-i18n="signIn">登录</button></div>
+    <p class="error" data-error-key="__ERROR_KEY__"></p>
+  </form>
+</main>
+<script>
+const translations = {
+  zh: {
+    subtitle: "请输入访问密码",
+    login: "登录",
+    password: "访问密码",
+    signIn: "登录",
+    invalidPassword: "密码不正确"
+  },
+  en: {
+    subtitle: "Enter the access password",
+    login: "Sign in",
+    password: "Access password",
+    signIn: "Sign in",
+    invalidPassword: "Incorrect password"
+  }
+};
+
+function initialLanguage() {
+  const saved = localStorage.getItem("ryo-monitor-lang");
+  if (saved === "zh" || saved === "en") return saved;
+  return navigator.language && navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
+let currentLang = initialLanguage();
+
+function t(key) {
+  return translations[currentLang][key] || translations.en[key] || key;
+}
+
+function applyLanguage() {
+  document.documentElement.lang = currentLang === "zh" ? "zh-CN" : "en";
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-lang]").forEach(button => {
+    button.classList.toggle("active", button.dataset.lang === currentLang);
+  });
+  const error = document.querySelector("[data-error-key]");
+  if (error && error.dataset.errorKey) {
+    error.textContent = t(error.dataset.errorKey);
+  }
+}
+
+document.querySelectorAll("[data-lang]").forEach(button => {
+  button.addEventListener("click", () => {
+    currentLang = button.dataset.lang;
+    localStorage.setItem("ryo-monitor-lang", currentLang);
+    applyLanguage();
+  });
+});
+
+applyLanguage();
+</script>
+</body>
+</html>

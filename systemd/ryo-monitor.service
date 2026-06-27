@@ -1,13 +1,21 @@
 [Unit]
-Description=RyoMonitor metrics collector
+Description=RyoMonitor (Go) - metrics collector + auth gateway
 After=network.target
 
 [Service]
 Type=simple
-EnvironmentFile=-/etc/ryo-monitor.env
-ExecStart=/opt/ryo-monitor/scripts/ryo-monitor.sh
+# 兼容旧安装：鉴权变量曾位于 /etc/ryo-mon-auth.env（可选）；新安装统一写入 /etc/ryo-monitor.env
+EnvironmentFile=-/etc/ryo-mon-auth.env
+EnvironmentFile=/etc/ryo-monitor.env
+ExecStart=/opt/ryo-monitor/bin/ryo-monitor
 Restart=always
-RestartSec=5
+RestartSec=3
+User=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadOnlyPaths=/opt/ryo-monitor
 
 [Install]
 WantedBy=multi-user.target

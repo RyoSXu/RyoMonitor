@@ -1,4 +1,5 @@
 app/status.json
+bin/
 *.tmp
 *.bak
 *.bak.*
