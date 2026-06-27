@@ -118,7 +118,7 @@ DOMAIN=mon.example.com bash scripts/install.sh
 安装脚本会要求输入登录密码，并把密码哈希和随机签名密钥写入：
 
 ```text
-/etc/ryo-mon-auth.env
+/etc/ryo-monitor.env
 ```
 
 不要把这个文件提交到 Git。
