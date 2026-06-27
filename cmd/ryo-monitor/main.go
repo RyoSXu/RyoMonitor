@@ -633,6 +633,9 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if strings.HasSuffix(target, ".webmanifest") {
+		w.Header().Set("Content-Type", "application/manifest+json; charset=utf-8")
+	}
 	w.Header().Set("Cache-Control", "private, max-age=30")
 	http.ServeFile(w, r, target)
 }

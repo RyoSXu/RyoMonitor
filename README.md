@@ -6,12 +6,13 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-RyoMonitor is a lightweight self-hosted VPS monitor with a dark dashboard, password login, and no frontend build step.
+RyoMonitor is a lightweight self-hosted VPS monitor with a light/dark dashboard, password login, and no frontend build step.
 
 It is built for small servers where a full monitoring stack is more than you need.
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="RyoMonitor dashboard" width="900">
+  <img src="docs/screenshot-light.png" alt="RyoMonitor dashboard (light)" width="49%">
+  <img src="docs/screenshot-dark.png" alt="RyoMonitor dashboard (dark)" width="49%">
 </p>
 
 ## Why RyoMonitor
@@ -20,8 +21,9 @@ It is built for small servers where a full monitoring stack is more than you nee
 - No database
 - No frontend build step
 - Single VPS deployment
-- Password-protected dashboard
-- Chinese and English web UI
+- Password-protected dashboard (with an optional trusted-reverse-proxy mode)
+- Chinese and English web UI, with a light/dark theme toggle
+- Installable to the iOS / Android home screen (PWA icons + web manifest)
 - Git-based update workflow
 
 ## Footprint
@@ -29,7 +31,7 @@ It is built for small servers where a full monitoring stack is more than you nee
 RyoMonitor is intentionally small. On the current VPS deployment:
 
 ```text
-Binary size: about 6.4 MB
+Binary size: about 7 MB
 Runtime memory: about 12 MB RSS (single Go process: collector + auth gateway + static)
 status.json: served from memory, never written to disk
 Database: none
@@ -43,7 +45,8 @@ Frontend build: none
 - Disk usage
 - Network throughput
 - Load average
-- Service status
+- Uptime
+- Service status (systemd units and Docker containers)
 - Top processes by memory usage
 
 ## How It Works
@@ -68,6 +71,8 @@ Caddy
 ```text
 app/index.html              Dashboard UI
 app/assets/logo.svg         Project logo and frontend icon
+app/assets/*.png            Home-screen / PWA icons (apple-touch-icon, 192, 512)
+app/assets/site.webmanifest Web app manifest (add-to-home-screen metadata)
 cmd/ryo-monitor/main.go     Backend: collector + auth gateway (Go)
 cmd/ryo-monitor/login.html  Login page (embedded into the binary)
 bin/ryo-monitor             Build output (git-ignored)
@@ -75,7 +80,7 @@ scripts/install.sh          First install helper
 scripts/update.sh           Git pull + rebuild + restart helper
 systemd/ryo-monitor.service systemd unit template
 caddy/Caddyfile.example     Caddy reverse proxy example
-docs/screenshot.png         Dashboard screenshot
+docs/screenshot-*.png       Dashboard screenshots (light / dark theme)
 .env.example                Example environment variables
 ```
 
@@ -172,6 +177,27 @@ MON_AUTH_SECRET=<random>
 RYO_MONITOR_IFACE=eth0
 RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh"
 ```
+
+| Variable | Purpose |
+| --- | --- |
+| `MON_AUTH_HOST` / `MON_AUTH_PORT` | Address the gateway binds to (keep on `127.0.0.1`). |
+| `MON_AUTH_WEB_ROOT` | Directory served as the dashboard (`app/`). |
+| `MON_AUTH_SESSION_TTL` | Login session lifetime in seconds. |
+| `MON_AUTH_PASSWORD_HASH` / `MON_AUTH_SECRET` | Login password hash and session-signing secret. |
+| `MON_AUTH_TRUST_PROXY` | Set to `1` to trust an upstream reverse proxy / SSO and skip the built-in login (then `HASH`/`SECRET` may be empty). |
+| `MON_AUTH_COOKIE` | Session cookie name (default `ryo_mon_session`). |
+| `RYO_MONITOR_IFACE` | Network interface used for throughput. |
+| `RYO_MONITOR_SERVICES` | Service pills to show (see below). |
+
+### Trusting a Reverse Proxy / SSO
+
+If authentication is already handled in front of RyoMonitor (e.g. Caddy `forward_auth`, an SSO portal, or a private network), set:
+
+```bash
+MON_AUTH_TRUST_PROXY=1
+```
+
+RyoMonitor then skips its own login page and serves the dashboard directly. Only enable this when access is already restricted upstream.
 
 ### Custom Service Checks
 

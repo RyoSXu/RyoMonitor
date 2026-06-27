@@ -6,6 +6,13 @@
 <title>RyoMonitor</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="/assets/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="manifest" href="/assets/site.webmanifest">
+<meta name="theme-color" content="#1A68CF">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RyoMonitor">
 <script>
 // 尽早设置主题，避免浅色偏好下的深色闪烁（FOUC）。
 (function(){
@@ -267,7 +274,7 @@ h1{
 
 .load-row{
   display:grid;
-  grid-template-columns:4em 1fr auto;
+  grid-template-columns:4em 1fr 3.5em;
   align-items:center;
   gap:12px;
 }
@@ -286,8 +293,8 @@ h1{
   font-size:14px;
   font-weight:600;
   font-variant-numeric:tabular-nums;
-  min-width:3ch;
-  text-align:right;
+  text-align:left;
+  padding-left:6px;
 }
 
 /* 与 UI 一致的自定义悬浮提示：替代原生 title，hover 立即显示 */
