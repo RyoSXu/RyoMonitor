@@ -192,6 +192,14 @@ RYO_MONITOR_SERVICES="Nginx=nginx Docker=docker PostgreSQL=postgresql"
 systemctl is-active <unit>
 ```
 
+要监控 **Docker 容器**（而非 systemd 单元），给名字加 `docker:` 前缀：
+
+```bash
+RYO_MONITOR_SERVICES="Caddy=caddy MyApp=docker:myapp"
+```
+
+`docker:<名称>` 通过 Docker 套接字（`/var/run/docker.sock`）探测，容器运行时显示为在线。
+
 ## 安全建议
 
 - 不要泄露 `MON_AUTH_SECRET`。

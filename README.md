@@ -193,6 +193,14 @@ The display name is shown as-is in the dashboard. The unit name is passed to:
 systemctl is-active <unit>
 ```
 
+To monitor a **Docker container** instead of a systemd unit, prefix the name with `docker:`:
+
+```bash
+RYO_MONITOR_SERVICES="Caddy=caddy MyApp=docker:myapp"
+```
+
+`docker:<name>` is checked via the Docker socket (`/var/run/docker.sock`) and shown as active when the container is running.
+
 ## Security Notes
 
 - Keep `MON_AUTH_SECRET` private.

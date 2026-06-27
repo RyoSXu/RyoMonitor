@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -11,6 +12,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -325,6 +327,39 @@ func uptimeText(sec uint64) string {
 	}
 }
 
+var dockerClient = &http.Client{
+	Timeout: 3 * time.Second,
+	Transport: &http.Transport{
+		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+			return net.Dial("unix", "/var/run/docker.sock")
+		},
+	},
+}
+
+// dockerContainerActive 查询 docker 容器运行状态：active / inactive / unknown。
+func dockerContainerActive(name string) string {
+	resp, err := dockerClient.Get("http://docker/containers/" + name + "/json")
+	if err != nil {
+		return "unknown"
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "inactive"
+	}
+	var v struct {
+		State struct {
+			Running bool `json:"Running"`
+		} `json:"State"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&v) != nil {
+		return "unknown"
+	}
+	if v.State.Running {
+		return "active"
+	}
+	return "inactive"
+}
+
 func collectServices() ([]service, string, string, string) {
 	openlist, caddy, ssh := "unknown", "unknown", "unknown"
 	var list []service
@@ -337,13 +372,18 @@ func collectServices() ([]service, string, string, string) {
 		if name == "" || unit == "" || name == unit {
 			continue
 		}
-		st := "unknown"
-		if out, err := exec.Command("systemctl", "is-active", unit).Output(); err == nil {
-			if s := strings.TrimSpace(string(out)); s != "" {
-				st = s
+		var st string
+		if strings.HasPrefix(unit, "docker:") {
+			st = dockerContainerActive(strings.TrimPrefix(unit, "docker:"))
+		} else {
+			st = "unknown"
+			if out, err := exec.Command("systemctl", "is-active", unit).Output(); err == nil {
+				if s := strings.TrimSpace(string(out)); s != "" {
+					st = s
+				}
+			} else if s := strings.TrimSpace(string(out)); s != "" {
+				st = s // is-active 对非 active 会返回非零退出码，但 stdout 仍是状态
 			}
-		} else if s := strings.TrimSpace(string(out)); s != "" {
-			st = s // is-active 对非 active 会返回非零退出码，但 stdout 仍是状态
 		}
 		switch unit {
 		case "openlist":
