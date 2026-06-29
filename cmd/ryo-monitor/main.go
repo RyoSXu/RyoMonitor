@@ -1,15 +1,9 @@
 // RyoMonitor — 轻量服务器监控（Go 版后端）。
-// 单进程：后台 goroutine 每秒采集指标到内存，HTTP 服务提供鉴权网关 + 静态页面 + /status.json。
+// 单进程：后台 goroutine 分层采集指标到内存，HTTP 服务提供鉴权网关 + 静态页面 + /status.json。
 package main
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/rand"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -25,27 +19,22 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	_ "embed"
-	_ "time/tzdata"
 )
 
-//go:embed login.html
-var loginPage string
-
 // ---------- 配置 ----------
+
+const (
+	tickCore     = time.Second
+	tickServices = 5 * time.Second
+	tickProcs    = 3 * time.Second
+)
 
 var (
 	webRoot      string
 	host         string
 	port         string
-	cookieName   string
-	sessionTTL   int64
-	passwordHash string
-	secret       []byte
 	iface        string
 	servicesSpec string
-	trustProxy   bool
 )
 
 func env(key, def string) string {
@@ -72,121 +61,9 @@ func loadConfig() {
 	webRoot = root
 	host = env("MON_AUTH_HOST", "127.0.0.1")
 	port = env("MON_AUTH_PORT", "8090")
-	cookieName = env("MON_AUTH_COOKIE", "ryo_mon_session")
-	ttl, err := strconv.ParseInt(env("MON_AUTH_SESSION_TTL", strconv.Itoa(7*24*60*60)), 10, 64)
-	if err != nil {
-		ttl = 7 * 24 * 60 * 60
-	}
-	sessionTTL = ttl
-	// MON_AUTH_TRUST_PROXY=1：信任前置反代/SSO 已鉴权，本服务跳过内置登录直接服务。
-	trustProxy = os.Getenv("MON_AUTH_TRUST_PROXY") == "1"
-	if trustProxy {
-		passwordHash = os.Getenv("MON_AUTH_PASSWORD_HASH")
-		secret = []byte(os.Getenv("MON_AUTH_SECRET"))
-	} else {
-		passwordHash = mustEnv("MON_AUTH_PASSWORD_HASH")
-		secret = []byte(mustEnv("MON_AUTH_SECRET"))
-	}
+	loadAuthConfig()
 	iface = env("RYO_MONITOR_IFACE", "eth0")
 	servicesSpec = env("RYO_MONITOR_SERVICES", "OpenList=openlist Caddy=caddy SSH=ssh")
-}
-
-// ---------- 鉴权 ----------
-
-var b64 = base64.RawURLEncoding
-
-// pbkdf2-hmac-sha256（标准库实现，避免外部依赖）
-func pbkdf2SHA256(password, salt []byte, iter, keyLen int) []byte {
-	hashLen := sha256.Size
-	numBlocks := (keyLen + hashLen - 1) / hashLen
-	dk := make([]byte, 0, numBlocks*hashLen)
-	for block := 1; block <= numBlocks; block++ {
-		prf := hmac.New(sha256.New, password)
-		prf.Write(salt)
-		var idx [4]byte
-		binary.BigEndian.PutUint32(idx[:], uint32(block))
-		prf.Write(idx[:])
-		u := prf.Sum(nil)
-		t := make([]byte, len(u))
-		copy(t, u)
-		for n := 2; n <= iter; n++ {
-			prf.Reset()
-			prf.Write(u)
-			u = prf.Sum(nil)
-			for i := range t {
-				t[i] ^= u[i]
-			}
-		}
-		dk = append(dk, t...)
-	}
-	return dk[:keyLen]
-}
-
-func verifyPassword(password string) bool {
-	parts := strings.SplitN(passwordHash, "$", 4)
-	if len(parts) != 4 || parts[0] != "pbkdf2_sha256" {
-		return false
-	}
-	iter, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return false
-	}
-	salt, err := b64.DecodeString(parts[2])
-	if err != nil {
-		return false
-	}
-	derived := pbkdf2SHA256([]byte(password), salt, iter, sha256.Size)
-	return subtle.ConstantTimeCompare([]byte(b64.EncodeToString(derived)), []byte(parts[3])) == 1
-}
-
-func signPayload(payload string) string {
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(payload))
-	return b64.EncodeToString([]byte(payload)) + "." + b64.EncodeToString(mac.Sum(nil))
-}
-
-func validSession(cookieHeader string) bool {
-	if cookieHeader == "" {
-		return false
-	}
-	var token string
-	for _, part := range strings.Split(cookieHeader, ";") {
-		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
-		if len(kv) == 2 && kv[0] == cookieName {
-			token = kv[1]
-		}
-	}
-	if token == "" || !strings.Contains(token, ".") {
-		return false
-	}
-	dot := strings.LastIndex(token, ".")
-	payloadB64, signature := token[:dot], token[dot+1:]
-	payloadBytes, err := b64.DecodeString(payloadB64)
-	if err != nil {
-		return false
-	}
-	payload := string(payloadBytes)
-	expected := signPayload(payload)
-	expectedSig := expected[strings.LastIndex(expected, ".")+1:]
-	if subtle.ConstantTimeCompare([]byte(signature), []byte(expectedSig)) != 1 {
-		return false
-	}
-	colon := strings.Index(payload, ":")
-	if colon < 0 {
-		return false
-	}
-	expiresAt, err := strconv.ParseInt(payload[:colon], 10, 64)
-	if err != nil {
-		return false
-	}
-	return expiresAt >= time.Now().Unix()
-}
-
-func makeSession() string {
-	nonceBytes := make([]byte, 18)
-	rand.Read(nonceBytes)
-	payload := fmt.Sprintf("%d:%s", time.Now().Unix()+sessionTTL, b64.EncodeToString(nonceBytes))
-	return signPayload(payload)
 }
 
 // ---------- 指标采集 ----------
@@ -225,9 +102,6 @@ type status struct {
 	Load5         string    `json:"load5"`
 	Load15        string    `json:"load15"`
 	Cores         int       `json:"cores"`
-	OpenList      string    `json:"openlist"`
-	Caddy         string    `json:"caddy"`
-	SSH           string    `json:"ssh"`
 	Services      []service `json:"services"`
 	Processes     []process `json:"processes"`
 }
@@ -236,8 +110,12 @@ const clkTck = 100 // USER_HZ
 const pageSize = 4096
 
 var (
-	statusMu   sync.RWMutex
-	statusJSON = []byte("{}")
+	statusMu      sync.RWMutex
+	statusJSON    = []byte("{}")
+	cachedSvcMu   sync.RWMutex
+	cachedSvc     []service
+	cachedProcMu  sync.RWMutex
+	cachedProc    []process
 )
 
 func readUintFile(path string) uint64 {
@@ -259,7 +137,7 @@ func cpuTotalIdle() (total, idle uint64) {
 	for i, v := range fs[1:] {
 		n, _ := strconv.ParseUint(v, 10, 64)
 		total += n
-		if i == 3 { // idle 列（与原 shell 一致，仅 idle）
+		if i == 3 {
 			idle = n
 		}
 	}
@@ -276,13 +154,12 @@ func meminfo() map[string]uint64 {
 		fs := strings.Fields(line)
 		if len(fs) >= 2 {
 			v, _ := strconv.ParseUint(fs[1], 10, 64)
-			out[strings.TrimSuffix(fs[0], ":")] = v // kB
+			out[strings.TrimSuffix(fs[0], ":")] = v
 		}
 	}
 	return out
 }
 
-// 仿 df -h 的人类可读（1024 进制）
 func humanDF(b uint64) string {
 	const unit = 1024.0
 	v := float64(b)
@@ -310,9 +187,9 @@ func diskStats(path string) (used, total, pct string) {
 	usedB := totalB - freeB
 	p := 0
 	if denom := usedB + availB; denom > 0 {
-		p = int((usedB*100 + denom - 1) / denom) // 仿 df 向上取整
+		p = int((usedB*100 + denom - 1) / denom)
 	}
-	return humanDF(usedB), humanDF(totalB), strconv.Itoa(p) + "%"
+	return humanDF(usedB), humanDF(totalB), strconv.Itoa(p)+"%"
 }
 
 func uptimeText(sec uint64) string {
@@ -338,7 +215,6 @@ var dockerClient = &http.Client{
 	},
 }
 
-// dockerContainerActive 查询 docker 容器运行状态：active / inactive / unknown。
 func dockerContainerActive(name string) string {
 	resp, err := dockerClient.Get("http://docker/containers/" + name + "/json")
 	if err != nil {
@@ -362,10 +238,6 @@ func dockerContainerActive(name string) string {
 	return "inactive"
 }
 
-// parseServiceEntries 解析 RYO_MONITOR_SERVICES：每项为「显示名=监控目标」。
-// 监控目标为 systemd 单元名，或 docker:<容器名>。
-// 含逗号/换行时按逗号或换行分隔条目（显示名可包含空格，如 "App Store=docker:asspp"）；
-// 否则回退到按空白分隔，兼容旧的 "OpenList=openlist Caddy=caddy" 写法。
 func parseServiceEntries(spec string) [][2]string {
 	var raw []string
 	if strings.ContainsAny(spec, ",\n") {
@@ -390,8 +262,7 @@ func parseServiceEntries(spec string) [][2]string {
 	return out
 }
 
-func collectServices() ([]service, string, string, string) {
-	openlist, caddy, ssh := "unknown", "unknown", "unknown"
+func collectServices() []service {
 	var list []service
 	for _, entry := range parseServiceEntries(servicesSpec) {
 		name, unit := entry[0], entry[1]
@@ -405,20 +276,12 @@ func collectServices() ([]service, string, string, string) {
 					st = s
 				}
 			} else if s := strings.TrimSpace(string(out)); s != "" {
-				st = s // is-active 对非 active 会返回非零退出码，但 stdout 仍是状态
+				st = s
 			}
-		}
-		switch unit {
-		case "openlist":
-			openlist = st
-		case "caddy":
-			caddy = st
-		case "ssh", "sshd":
-			ssh = st
 		}
 		list = append(list, service{Name: name, Unit: unit, Status: st})
 	}
-	return list, openlist, caddy, ssh
+	return list
 }
 
 func topProcesses(memTotalKB uint64) []process {
@@ -497,7 +360,7 @@ func loadavg() (string, string, string) {
 	return fs[0], fs[1], fs[2]
 }
 
-func collectOnce(prevRx, prevTx, prevTotal, prevIdle uint64) (status, uint64, uint64, uint64, uint64) {
+func collectCore(prevRx, prevTx, prevTotal, prevIdle uint64, svcs []service, procs []process) (status, uint64, uint64, uint64, uint64) {
 	rx := readUintFile("/sys/class/net/" + iface + "/statistics/rx_bytes")
 	tx := readUintFile("/sys/class/net/" + iface + "/statistics/tx_bytes")
 	total, idle := cpuTotalIdle()
@@ -546,7 +409,6 @@ func collectOnce(prevRx, prevTx, prevTotal, prevIdle uint64) (status, uint64, ui
 		}
 	}
 	l1, l5, l15 := loadavg()
-	svcs, openlist, caddy, ssh := collectServices()
 
 	st := status{
 		Updated:       time.Now().Format("2006-01-02 15:04:05"),
@@ -568,23 +430,71 @@ func collectOnce(prevRx, prevTx, prevTotal, prevIdle uint64) (status, uint64, ui
 		Load5:         l5,
 		Load15:        l15,
 		Cores:         runtime.NumCPU(),
-		OpenList:      openlist,
-		Caddy:         caddy,
-		SSH:           ssh,
 		Services:      svcs,
-		Processes:     topProcesses(memTotal),
+		Processes:     procs,
 	}
 	return st, rx, tx, total, idle
+}
+
+func refreshServices() {
+	svcs := collectServices()
+	cachedSvcMu.Lock()
+	cachedSvc = svcs
+	cachedSvcMu.Unlock()
+}
+
+func refreshProcesses() {
+	mi := meminfo()
+	procs := topProcesses(mi["MemTotal"])
+	cachedProcMu.Lock()
+	cachedProc = procs
+	cachedProcMu.Unlock()
+}
+
+func snapshotCached() ([]service, []process) {
+	cachedSvcMu.RLock()
+	svcs := cachedSvc
+	cachedSvcMu.RUnlock()
+	cachedProcMu.RLock()
+	procs := cachedProc
+	cachedProcMu.RUnlock()
+	if svcs == nil {
+		svcs = []service{}
+	}
+	if procs == nil {
+		procs = []process{}
+	}
+	return svcs, procs
 }
 
 func collector() {
 	prevRx := readUintFile("/sys/class/net/" + iface + "/statistics/rx_bytes")
 	prevTx := readUintFile("/sys/class/net/" + iface + "/statistics/tx_bytes")
 	prevTotal, prevIdle := cpuTotalIdle()
-	for {
-		time.Sleep(time.Second)
-		st, rx, tx, total, idle := collectOnce(prevRx, prevTx, prevTotal, prevIdle)
+
+	refreshServices()
+	refreshProcesses()
+	lastSvc := time.Now()
+	lastProc := time.Now()
+
+	ticker := time.NewTicker(tickCore)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		now := time.Now()
+		if now.Sub(lastSvc) >= tickServices {
+			refreshServices()
+			lastSvc = now
+		}
+		if now.Sub(lastProc) >= tickProcs {
+			refreshProcesses()
+			lastProc = now
+		}
+
+		svcs, procs := snapshotCached()
+		st, rx, tx, total, idle := collectCore(prevRx, prevTx, prevTotal, prevIdle, svcs, procs)
 		prevRx, prevTx, prevTotal, prevIdle = rx, tx, total, idle
+
 		if data, err := json.Marshal(st); err == nil {
 			statusMu.Lock()
 			statusJSON = data
@@ -640,23 +550,6 @@ func serveStatic(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, target)
 }
 
-func sendLogin(w http.ResponseWriter, r *http.Request, statusCode int, errorKey, nextPath string) {
-	page := strings.ReplaceAll(loginPage, "__ERROR_KEY__", htmlEscapeAttr(errorKey))
-	page = strings.ReplaceAll(page, "__NEXT__", htmlEscapeAttr(nextPath))
-	body := []byte(page)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(statusCode)
-	if r.Method != http.MethodHead {
-		w.Write(body)
-	}
-}
-
-func htmlEscapeAttr(s string) string {
-	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;", "'", "&#x27;")
-	return r.Replace(s)
-}
-
 func handler(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 	cookie := r.Header.Get("Cookie")
@@ -667,23 +560,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
 		return
 	case path == "/logout":
-		http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: 0, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		handleLogout(w, r)
 		return
 	case path == "/login":
-		if r.Method == http.MethodPost {
-			handleLoginPost(w, r)
-			return
-		}
-		if trustProxy || validSession(cookie) {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-			return
-		}
-		next := r.URL.Query().Get("next")
-		if !strings.HasPrefix(next, "/") {
-			next = "/"
-		}
-		sendLogin(w, r, http.StatusOK, "", next)
+		handleLogin(w, r, cookie)
 		return
 	case path == "/favicon.svg" || strings.HasPrefix(path, "/assets/"):
 		serveStatic(w, r)
@@ -695,8 +575,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !trustProxy && !validSession(cookie) {
-		http.Redirect(w, r, "/login?next="+url.QueryEscape(r.URL.RequestURI()), http.StatusSeeOther)
+	if !authenticated(cookie) {
+		redirectUnauthenticated(w, r)
 		return
 	}
 
@@ -713,39 +593,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	serveStatic(w, r)
 }
 
-func handleLoginPost(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	password := r.PostFormValue("password")
-	next := r.PostFormValue("next")
-	if !strings.HasPrefix(next, "/") {
-		next = "/"
-	}
-	if !verifyPassword(password) {
-		time.Sleep(800 * time.Millisecond)
-		sendLogin(w, r, http.StatusUnauthorized, "invalidPassword", next)
-		return
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name: cookieName, Value: makeSession(), Path: "/",
-		MaxAge: int(sessionTTL), HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode,
-	})
-	http.Redirect(w, r, next, http.StatusSeeOther)
-}
-
-// genEnv 打印一份完整的环境变量文件（含 PBKDF2 密码哈希与随机 secret），供安装脚本使用，免去 python 依赖。
 func genEnv(password string) {
-	salt := make([]byte, 16)
-	rand.Read(salt)
-	const iter = 260000
-	dk := pbkdf2SHA256([]byte(password), salt, iter, sha256.Size)
-	sec := make([]byte, 36)
-	rand.Read(sec)
 	fmt.Println("MON_AUTH_HOST=127.0.0.1")
 	fmt.Println("MON_AUTH_PORT=8090")
 	fmt.Println("MON_AUTH_WEB_ROOT=/opt/ryo-monitor/app")
-	fmt.Println("MON_AUTH_SESSION_TTL=604800")
-	fmt.Printf("MON_AUTH_PASSWORD_HASH=pbkdf2_sha256$%d$%s$%s\n", iter, b64.EncodeToString(salt), b64.EncodeToString(dk))
-	fmt.Println("MON_AUTH_SECRET=" + b64.EncodeToString(sec))
+	writeGenEnvAuth(password)
 	fmt.Println("RYO_MONITOR_IFACE=eth0")
 	fmt.Println(`RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh"`)
 }

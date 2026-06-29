@@ -13,16 +13,13 @@ fi
 
 cd "$PROJECT_DIR"
 
-# 构建二进制（若尚未构建）。需要本机 Go，或预先用 Docker 构建好 bin/ryo-monitor。
+# 构建二进制（若尚未构建）。需要本机 Go，或预先用 scripts/build.sh（支持 Docker）。
 if [ ! -x "$BIN" ]; then
-  if command -v go >/dev/null 2>&1; then
-    echo "Building ryo-monitor ..."
-    CGO_ENABLED=0 go build -ldflags='-s -w' -o "$BIN" ./cmd/ryo-monitor
+  if command -v go >/dev/null 2>&1 || command -v docker >/dev/null 2>&1; then
+    bash "$PROJECT_DIR/scripts/build.sh"
   else
-    echo "未找到已构建的 $BIN，且本机无 go。" >&2
-    echo "请先构建，例如用 Docker：" >&2
-    echo "  docker run --rm -v \"$PROJECT_DIR\":/src -w /src golang:1-alpine \\" >&2
-    echo "    sh -c \"CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/ryo-monitor ./cmd/ryo-monitor\"" >&2
+    echo "未找到已构建的 $BIN，且本机无 go/docker。" >&2
+    echo "请先运行 scripts/build.sh 构建 bin/ryo-monitor。" >&2
     exit 1
   fi
 fi

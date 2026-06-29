@@ -10,12 +10,7 @@ if command -v git >/dev/null 2>&1 && [ -d .git ]; then
   git pull --ff-only
 fi
 
-if command -v go >/dev/null 2>&1; then
-  CGO_ENABLED=0 go build -ldflags='-s -w' -o "$BIN" ./cmd/ryo-monitor
-else
-  docker run --rm -v "$PROJECT_DIR":/src -w /src golang:1-alpine \
-    sh -c "CGO_ENABLED=0 go build -ldflags='-s -w' -o bin/ryo-monitor ./cmd/ryo-monitor"
-fi
+bash "$PROJECT_DIR/scripts/build.sh"
 
 install -m 0644 systemd/ryo-monitor.service /etc/systemd/system/ryo-monitor.service
 systemctl daemon-reload

@@ -694,14 +694,7 @@ function formatUptime(seconds, fallback) {
 }
 
 function serviceList(s) {
-  if (Array.isArray(s.services) && s.services.length > 0) {
-    return s.services;
-  }
-  return [
-    { name: "OpenList", status: s.openlist },
-    { name: "Caddy", status: s.caddy },
-    { name: "SSH", status: s.ssh }
-  ];
+  return Array.isArray(s.services) ? s.services : [];
 }
 
 function escapeAttr(value) {
