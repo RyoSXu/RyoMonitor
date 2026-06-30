@@ -10,10 +10,19 @@ RyoMonitor is a lightweight self-hosted VPS monitor with a light/dark dashboard,
 
 It is built for small servers where a full monitoring stack is more than you need.
 
+<p align="center"><strong>Desktop</strong></p>
 <p align="center">
-  <img src="docs/screenshot-light.png" alt="RyoMonitor dashboard (light)" width="49%">
-  <img src="docs/screenshot-dark.png" alt="RyoMonitor dashboard (dark)" width="49%">
+  <img src="docs/screenshot-desktop-light.png" alt="RyoMonitor desktop (light, 中文)" width="49%">
+  <img src="docs/screenshot-desktop-dark.png" alt="RyoMonitor desktop (dark, English)" width="49%">
 </p>
+<p align="center"><sub>Light · 中文 UI &nbsp;|&nbsp; Dark · English UI</sub></p>
+
+<p align="center"><strong>Mobile</strong></p>
+<p align="center">
+  <img src="docs/screenshot-mobile-light.png" alt="RyoMonitor mobile (light, 中文)" width="30%">
+  <img src="docs/screenshot-mobile-dark-en.png" alt="RyoMonitor mobile (dark, English)" width="30%">
+</p>
+<p align="center"><sub>Responsive layout on narrow screens</sub></p>
 
 ## Why RyoMonitor
 

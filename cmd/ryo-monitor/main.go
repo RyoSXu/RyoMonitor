@@ -189,7 +189,7 @@ func diskStats(path string) (used, total, pct string) {
 	if denom := usedB + availB; denom > 0 {
 		p = int((usedB*100 + denom - 1) / denom)
 	}
-	return humanDF(usedB), humanDF(totalB), strconv.Itoa(p)+"%"
+	return humanDF(usedB), humanDF(totalB), strconv.Itoa(p)
 }
 
 func uptimeText(sec uint64) string {
