@@ -238,10 +238,43 @@ h1{
 .bar.crit > span{background:var(--dot-bad);}
 
 /* 网络迷你折线图（下行/上行随时间，自动缩放） */
-.net-value{
+.net-card{
+  container-type:inline-size;
+}
+
+.value.net-value{
   display:flex;
-  gap:12px;
-  font-size:18px;
+  justify-content:flex-start;
+  align-items:baseline;
+  gap:10px;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  font-size:clamp(15px,calc(100cqw / 13.2),18px);
+  font-weight:700;
+  line-height:1.2;
+  white-space:nowrap;
+  overflow:hidden;
+}
+
+.net-item{
+  display:inline-flex;
+  align-items:baseline;
+  gap:1px;
+  flex:0 0 auto;
+  font-variant-numeric:tabular-nums;
+}
+
+.net-arrow{
+  font-size:0.82em;
+  flex-shrink:0;
+}
+
+.net-num{font-variant-numeric:tabular-nums;}
+
+.net-unit{
+  font-size:0.85em;
+  font-weight:600;
 }
 
 .net-value .rx{color:var(--net-rx);}
@@ -379,6 +412,10 @@ tbody tr:last-child td{
     grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
   }
 
+  .metrics-main .net-card{
+    grid-column:1 / -1;
+  }
+
   .load-card{
     grid-column:auto;
   }
@@ -424,7 +461,7 @@ tbody tr:last-child td{
     <div class="detail" id="disk-detail">--</div>
   </div>
 
-  <div class="card">
+  <div class="card net-card">
     <div class="label" data-i18n="network">网络</div>
     <div class="value net-value" id="net">--</div>
     <svg class="spark" id="net-spark" viewBox="0 0 100 42" preserveAspectRatio="none" aria-hidden="true">
@@ -615,10 +652,24 @@ function sparkPath(arr, max) {
   return d.trim();
 }
 
+// 将 KB/s 格式化为 KB/s、MB/s 或 GB/s（≥1 MB 起保留两位小数）。
+function formatNetSpeed(kb) {
+  const v = parseFloat(kb);
+  if (!Number.isFinite(v)) return {num: "--", unit: "KB/s"};
+  if (v >= 1024 * 1024) return {num: (v / (1024 * 1024)).toFixed(2), unit: "GB/s"};
+  if (v >= 1024) return {num: (v / 1024).toFixed(2), unit: "MB/s"};
+  return {num: String(Math.round(v)), unit: "KB/s"};
+}
+
+function netSpeedItem(cls, arrow, kb) {
+  const {num, unit} = formatNetSpeed(kb);
+  return `<span class="net-item ${cls}"><span class="net-arrow">${arrow}</span><span class="net-num">${num}</span><span class="net-unit">${unit}</span></span>`;
+}
+
 function renderNetwork(rxKb, txKb) {
   const rx = parseFloat(rxKb), tx = parseFloat(txKb);
   document.getElementById("net").innerHTML =
-    `<span class="rx">↓ ${rxKb}</span><span class="tx">↑ ${txKb} KB/s</span>`;
+    netSpeedItem("rx", "↓", rxKb) + netSpeedItem("tx", "↑", txKb);
   pushHistory(netRxHist, rx);
   pushHistory(netTxHist, tx);
   // 下行/上行共享同一纵轴峰值，便于直接比较两条线的相对大小。
