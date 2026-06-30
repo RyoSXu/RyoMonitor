@@ -166,17 +166,17 @@ h1{
   margin-bottom:20px;
 }
 
-.metrics-main{
+.metrics{
   grid-template-columns:repeat(4,1fr);
 }
 
-.metrics-second{
-  grid-template-columns:repeat(4,1fr);
-}
-
-.load-card{
-  grid-column:span 3;
-}
+/* 桌面：第一行 CPU/内存/磁盘/Swap，第二行 网络(2列) + 平均负载(跨2列) */
+.metrics > :nth-child(1){grid-column:1;grid-row:1;}
+.metrics > :nth-child(2){grid-column:2;grid-row:1;}
+.metrics > :nth-child(3){grid-column:3;grid-row:1;}
+.metrics > :nth-child(4){grid-column:4;grid-row:1;}
+.metrics > :nth-child(5){grid-column:1 / span 2;grid-row:2;}
+.metrics > :nth-child(6){grid-column:3 / span 2;grid-row:2;}
 
 .card{
   background:var(--card);
@@ -185,6 +185,8 @@ h1{
   padding:16px;
   box-sizing:border-box;
   min-height:118px;
+  display:flex;
+  flex-direction:column;
 }
 
 .label{
@@ -207,6 +209,11 @@ h1{
   line-height:1.45;
   color:var(--fg);
   white-space:pre-line;
+  min-height:1.45em;
+}
+
+.detail-placeholder{
+  visibility:hidden;
 }
 
 .load-detail{
@@ -307,9 +314,9 @@ h1{
 
 .load-row{
   display:grid;
-  grid-template-columns:4em 1fr 3.5em;
+  grid-template-columns:3em 1fr 3em;
   align-items:center;
-  gap:12px;
+  gap:12px 8px;
 }
 
 .load-name{
@@ -326,8 +333,9 @@ h1{
   font-size:14px;
   font-weight:600;
   font-variant-numeric:tabular-nums;
-  text-align:left;
-  padding-left:6px;
+  text-align:right;
+  justify-self:end;
+  width:100%;
 }
 
 /* 与 UI 一致的自定义悬浮提示：替代原生 title，hover 立即显示 */
@@ -407,17 +415,30 @@ tbody tr:last-child td{
     padding:20px;
   }
 
-  .metrics-main,
-  .metrics-second{
-    grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  .service-strip{
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+    padding-bottom:2px;
   }
 
-  .metrics-main .net-card{
-    grid-column:1 / -1;
+  .service-strip::-webkit-scrollbar{
+    display:none;
   }
 
-  .load-card{
+  .metrics{
+    grid-template-columns:repeat(2,1fr);
+  }
+
+  .metrics > .card{
     grid-column:auto;
+    grid-row:auto;
+  }
+
+  .metrics .net-card,
+  .metrics .load-card{
+    grid-column:1 / -1;
   }
 }
 </style>
@@ -440,11 +461,12 @@ tbody tr:last-child td{
   <div class="pill"><span class="dot"></span><span data-i18n="loading">加载中...</span></div>
 </div>
 
-<div class="grid metrics-main">
+<div class="grid metrics">
   <div class="card">
     <div class="label" data-i18n="cpu">CPU</div>
     <div class="value" id="cpu">--%</div>
     <div class="bar" id="cpu-bar"><span></span></div>
+    <div class="detail detail-placeholder" aria-hidden="true">&nbsp;</div>
   </div>
 
   <div class="card">
@@ -461,6 +483,13 @@ tbody tr:last-child td{
     <div class="detail" id="disk-detail">--</div>
   </div>
 
+  <div class="card">
+    <div class="label" data-i18n="swap">Swap</div>
+    <div class="value" id="swap">--%</div>
+    <div class="bar" id="swap-bar"><span></span></div>
+    <div class="detail" id="swap-detail">--</div>
+  </div>
+
   <div class="card net-card">
     <div class="label" data-i18n="network">网络</div>
     <div class="value net-value" id="net">--</div>
@@ -468,15 +497,6 @@ tbody tr:last-child td{
       <path class="spark-rx" id="net-spark-rx"></path>
       <path class="spark-tx" id="net-spark-tx"></path>
     </svg>
-  </div>
-</div>
-
-<div class="grid metrics-second">
-  <div class="card">
-    <div class="label" data-i18n="swap">Swap</div>
-    <div class="value" id="swap">--%</div>
-    <div class="bar" id="swap-bar"><span></span></div>
-    <div class="detail" id="swap-detail">--</div>
   </div>
 
   <div class="card load-card">
@@ -617,8 +637,14 @@ function setBar(id, raw) {
 }
 
 // 平均负载条：按 load/核数 归一化（每核 1.0 = 满载 100%）。
+function formatLoad(raw) {
+  const v = parseFloat(raw);
+  if (!Number.isFinite(v)) return "--";
+  return v.toFixed(2);
+}
+
 function setLoad(barId, numId, raw, cores) {
-  text(numId, raw);
+  text(numId, formatLoad(raw));
   const v = parseFloat(raw);
   setBar(barId, Number.isFinite(v) ? (v / cores) * 100 : NaN);
 }
