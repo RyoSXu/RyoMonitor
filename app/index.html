@@ -208,19 +208,38 @@ h1{
   font-weight:600;
   line-height:1.45;
   color:var(--fg);
-  white-space:pre-line;
+  white-space:nowrap;
   min-height:1.45em;
+}
+
+.detail-split{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+  min-height:calc(1.45em * 2 + 2px);
+}
+
+.detail-used,
+.detail-total{
+  text-align:left;
 }
 
 .detail-placeholder{
   visibility:hidden;
 }
 
-.load-detail{
-  font-size:14px;
-  font-weight:600;
-  line-height:1.6;
-  white-space:pre-line;
+@media(min-width:761px){
+  .detail-split{
+    flex-direction:row;
+    gap:0;
+    min-height:1.45em;
+  }
+
+  .detail-used,
+  .detail-total{
+    flex:1 1 50%;
+    min-width:0;
+  }
 }
 
 /* 细条进度条：嵌在卡片内部，不改变卡片尺寸 */
@@ -276,8 +295,6 @@ h1{
   font-size:0.82em;
   flex-shrink:0;
 }
-
-.net-num{font-variant-numeric:tabular-nums;}
 
 .net-unit{
   font-size:0.85em;
@@ -415,18 +432,6 @@ tbody tr:last-child td{
     padding:20px;
   }
 
-  .service-strip{
-    flex-wrap:nowrap;
-    overflow-x:auto;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
-    padding-bottom:2px;
-  }
-
-  .service-strip::-webkit-scrollbar{
-    display:none;
-  }
-
   .metrics{
     grid-template-columns:repeat(2,1fr);
   }
@@ -466,28 +471,40 @@ tbody tr:last-child td{
     <div class="label" data-i18n="cpu">CPU</div>
     <div class="value" id="cpu">--%</div>
     <div class="bar" id="cpu-bar"><span></span></div>
-    <div class="detail detail-placeholder" aria-hidden="true">&nbsp;</div>
+    <div class="detail detail-split detail-placeholder" aria-hidden="true">
+      <span class="detail-used">&nbsp;</span>
+      <span class="detail-total">&nbsp;</span>
+    </div>
   </div>
 
   <div class="card">
     <div class="label" data-i18n="memory">内存</div>
     <div class="value" id="mem">--%</div>
     <div class="bar" id="mem-bar"><span></span></div>
-    <div class="detail" id="mem-detail">--</div>
+    <div class="detail detail-split">
+      <span class="detail-used" id="mem-detail-used">--</span>
+      <span class="detail-total" id="mem-detail-total">--</span>
+    </div>
   </div>
 
   <div class="card">
     <div class="label" data-i18n="disk">磁盘</div>
     <div class="value" id="disk">--%</div>
     <div class="bar" id="disk-bar"><span></span></div>
-    <div class="detail" id="disk-detail">--</div>
+    <div class="detail detail-split">
+      <span class="detail-used" id="disk-detail-used">--</span>
+      <span class="detail-total" id="disk-detail-total">--</span>
+    </div>
   </div>
 
   <div class="card">
     <div class="label" data-i18n="swap">Swap</div>
     <div class="value" id="swap">--%</div>
     <div class="bar" id="swap-bar"><span></span></div>
-    <div class="detail" id="swap-detail">--</div>
+    <div class="detail detail-split">
+      <span class="detail-used" id="swap-detail-used">--</span>
+      <span class="detail-total" id="swap-detail-total">--</span>
+    </div>
   </div>
 
   <div class="card net-card">
@@ -556,17 +573,10 @@ const translations = {
     rss: "实际占用",
     used: "已用",
     total: "总计",
-    oneMinuteLoad: "过去 1 分钟负载",
-    fiveMinuteLoad: "过去 5 分钟负载",
-    fifteenMinuteLoad: "过去 15 分钟负载",
     load1m: "1 分钟",
     load5m: "5 分钟",
     load15m: "15 分钟",
     noData: "暂无数据",
-    statusActive: "运行中",
-    statusInactive: "已停止",
-    statusFailed: "异常",
-    statusUnknown: "未知",
     uptimeDay: "天",
     uptimeHour: "小时",
     uptimeMinute: "分钟",
@@ -585,17 +595,10 @@ const translations = {
     rss: "RSS",
     used: "Used",
     total: "Total",
-    oneMinuteLoad: "1 minute load",
-    fiveMinuteLoad: "5 minute load",
-    fifteenMinuteLoad: "15 minute load",
     load1m: "1 min",
     load5m: "5 min",
     load15m: "15 min",
     noData: "No data",
-    statusActive: "Running",
-    statusInactive: "Stopped",
-    statusFailed: "Failed",
-    statusUnknown: "Unknown",
     uptimeDay: "d",
     uptimeHour: "h",
     uptimeMinute: "m",
@@ -649,6 +652,17 @@ function setLoad(barId, numId, raw, cores) {
   setBar(barId, Number.isFinite(v) ? (v / cores) * 100 : NaN);
 }
 
+function setUsageCard(pctId, barId, pct, usedId, totalId, used, total) {
+  text(pctId, pct + "%");
+  setBar(barId, pct);
+  setUsageDetail(usedId, totalId, used, total);
+}
+
+function setUsageDetail(usedId, totalId, usedVal, totalVal) {
+  text(usedId, `${t("used")} ${usedVal}`);
+  text(totalId, `${t("total")} ${totalVal}`);
+}
+
 // ---------- 网络迷你折线图 ----------
 
 const NET_HISTORY = 60; // 保留最近 60 个采样点（约 1 分钟）
@@ -678,17 +692,65 @@ function sparkPath(arr, max) {
   return d.trim();
 }
 
-// 将 KB/s 格式化为 KB/s、MB/s 或 GB/s（≥1 MB 起保留两位小数）。
-function formatNetSpeed(kb) {
-  const v = parseFloat(kb);
-  if (!Number.isFinite(v)) return {num: "--", unit: "KB/s"};
-  if (v >= 1024 * 1024) return {num: (v / (1024 * 1024)).toFixed(2), unit: "GB/s"};
-  if (v >= 1024) return {num: (v / 1024).toFixed(2), unit: "MB/s"};
-  return {num: String(Math.round(v)), unit: "KB/s"};
+// 按 1024 自动换算单位（存储 / 网络速率共用）。
+const BYTE_UNITS = ["B", "KB", "MB", "GB", "TB"];
+const RATE_UNITS = ["KB", "MB", "GB"];
+
+function formatScaled(value, { units, suffix = "", split = false, style = "storage" } = {}) {
+  const v = parseFloat(value);
+  const baseUnit = (units[0] || "") + suffix;
+  if (!Number.isFinite(v) || v < 0) {
+    return split ? { num: "--", unit: baseUnit } : "--";
+  }
+  let n = v;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  const unit = units[i] + suffix;
+  let num;
+  if (style === "rate") {
+    num = i === 0 ? String(Math.round(n)) : n.toFixed(2);
+  } else if (i < 2) {
+    num = String(Math.round(n));
+  } else if (n >= 10 || Math.abs(n - Math.round(n)) < 1e-6) {
+    num = String(Math.round(n));
+  } else {
+    num = n.toFixed(2);
+  }
+  return split ? { num, unit } : `${num} ${unit}`;
+}
+
+function parseHumanSize(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return NaN;
+  const m = s.match(/^([\d.]+)\s*([KMGTPEB])?$/i);
+  if (!m) return NaN;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n)) return NaN;
+  const exp = { B: 0, K: 1, M: 2, G: 3, T: 4, P: 5, E: 6 };
+  const p = exp[(m[2] || "B").toUpperCase()];
+  return p === undefined ? NaN : n * Math.pow(1024, p);
+}
+
+function formatBytes(bytes) {
+  return formatScaled(bytes, { units: BYTE_UNITS, style: "storage" });
+}
+
+function formatFromMb(mb) {
+  const v = parseFloat(mb);
+  if (!Number.isFinite(v)) return "--";
+  return formatBytes(v * 1024 * 1024);
+}
+
+function formatStorage(raw) {
+  const bytes = parseHumanSize(raw);
+  return Number.isFinite(bytes) ? formatBytes(bytes) : "--";
 }
 
 function netSpeedItem(cls, arrow, kb) {
-  const {num, unit} = formatNetSpeed(kb);
+  const {num, unit} = formatScaled(kb, { units: RATE_UNITS, suffix: "/s", split: true, style: "rate" });
   return `<span class="net-item ${cls}"><span class="net-arrow">${arrow}</span><span class="net-num">${num}</span><span class="net-unit">${unit}</span></span>`;
 }
 
@@ -746,12 +808,8 @@ function toggleTheme() {
   applyTheme();
 }
 
-function statusName(value) {
-  if (value === "active") return t("statusActive");
-  if (value === "inactive") return t("statusInactive");
-  if (value === "failed") return t("statusFailed");
-  if (value === "unknown") return t("statusUnknown");
-  return value || "--";
+function serviceList(s) {
+  return Array.isArray(s.services) ? s.services : [];
 }
 
 function formatUptime(seconds, fallback) {
@@ -760,18 +818,9 @@ function formatUptime(seconds, fallback) {
   const days = Math.floor(total / 86400);
   const hours = Math.floor((total % 86400) / 3600);
   const minutes = Math.floor((total % 3600) / 60);
-  if (currentLang === "zh") {
-    if (days > 0) return `${t("uptimePrefix")} ${days}${t("uptimeDay")} ${hours}${t("uptimeHour")} ${minutes}${t("uptimeMinute")}`;
-    if (hours > 0) return `${t("uptimePrefix")} ${hours}${t("uptimeHour")} ${minutes}${t("uptimeMinute")}`;
-    return `${t("uptimePrefix")} ${minutes}${t("uptimeMinute")}`;
-  }
   if (days > 0) return `${t("uptimePrefix")} ${days}${t("uptimeDay")} ${hours}${t("uptimeHour")} ${minutes}${t("uptimeMinute")}`;
   if (hours > 0) return `${t("uptimePrefix")} ${hours}${t("uptimeHour")} ${minutes}${t("uptimeMinute")}`;
   return `${t("uptimePrefix")} ${minutes}${t("uptimeMinute")}`;
-}
-
-function serviceList(s) {
-  return Array.isArray(s.services) ? s.services : [];
 }
 
 function escapeAttr(value) {
@@ -813,24 +862,17 @@ function render(s) {
   text("cpu", s.cpu + "%");
   setBar("cpu-bar", s.cpu);
 
-  text("mem", s.mem_pct + "%");
-  setBar("mem-bar", s.mem_pct);
-  text("mem-detail", `${t("used")} ${s.mem_used}M · ${t("total")} ${s.mem_total}M`);
-
-  text("disk", s.disk_pct);
-  setBar("disk-bar", s.disk_pct);
-  text("disk-detail", `${t("used")} ${s.disk_used} · ${t("total")} ${s.disk_total}`);
+  setUsageCard("mem", "mem-bar", s.mem_pct, "mem-detail-used", "mem-detail-total", formatFromMb(s.mem_used), formatFromMb(s.mem_total));
+  setUsageCard("disk", "disk-bar", s.disk_pct, "disk-detail-used", "disk-detail-total", formatStorage(s.disk_used), formatStorage(s.disk_total));
 
   renderNetwork(s.rx_kb, s.tx_kb);
 
-  text("swap", s.swap_pct + "%");
-  setBar("swap-bar", s.swap_pct);
-  text("swap-detail", `${t("used")} ${s.swap_used}M · ${t("total")} ${s.swap_total}M`);
+  setUsageCard("swap", "swap-bar", s.swap_pct, "swap-detail-used", "swap-detail-total", formatFromMb(s.swap_used), formatFromMb(s.swap_total));
 
   const cores = Number(s.cores) || 1;
-  setLoad("load1-bar", "load1-num", s.load1, cores);
-  setLoad("load5-bar", "load5-num", s.load5, cores);
-  setLoad("load15-bar", "load15-num", s.load15, cores);
+  [["load1", s.load1], ["load5", s.load5], ["load15", s.load15]].forEach(([k, v]) => {
+    setLoad(`${k}-bar`, `${k}-num`, v, cores);
+  });
 
   document.getElementById("processes").innerHTML = (s.processes || []).map(p => `
     <tr>
@@ -838,7 +880,7 @@ function render(s) {
       <td>${p.name}</td>
       <td>${p.cpu}%</td>
       <td>${p.mem}%</td>
-      <td>${p.rss} MB</td>
+      <td>${formatFromMb(p.rss)}</td>
     </tr>
   `).join("") || `<tr><td colspan="5">${t("noData")}</td></tr>`;
 
