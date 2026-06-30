@@ -39,7 +39,7 @@ It is built for small servers where a full monitoring stack is more than you nee
 
 ```text
 Binary: about 6.5 MB (`trustproxy` build) / about 6.6 MB (built-in login)
-Runtime memory: about 8 MB RSS
+Runtime memory: about 10 MB RSS (typically under 15 MB)
 status.json: served from memory, never written to disk
 Database: none
 Frontend build: none
@@ -204,7 +204,7 @@ MON_AUTH_SESSION_TTL=604800
 MON_AUTH_PASSWORD_HASH=pbkdf2_sha256$260000$<salt>$<hash>
 MON_AUTH_SECRET=<random>
 RYO_MONITOR_IFACE=eth0
-RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh"
+RYO_MONITOR_SERVICES="OpenList=openlist Caddy=caddy SSH=ssh RyoAuthGate=auth-gate ConvertX=docker:convertx"
 ```
 
 | Variable | Purpose |
